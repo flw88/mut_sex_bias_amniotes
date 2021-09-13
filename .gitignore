@@ -1,0 +1,9 @@
+# General file names to ignore
+.DS_Store
+._*
+*.pdf
+.ipynb_checkpoints/
+
+# Specific directories
+./scripts/lm_res/
+./features/
