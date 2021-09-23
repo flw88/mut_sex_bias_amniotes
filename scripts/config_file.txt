@@ -1,0 +1,4 @@
+Mammals	Mammals	Homo_sapiens	chrX	-sfn	29837	gc	241-mammalian-2020v2.hal	XY
+Mammals	Mammals	Mus_musculus	chrX	-sfn	31234	gc	241-mammalian-2020v2.hal	XY
+Aves	Aves_g1,Aves_g2,Aves_g3,Aves_g4,Aves_g5,Aves_g6	Gallus_gallus	chrZ	-sfn	178	gc	363-avian-2020.hal	ZW
+Serpentes	Serpentes	Thamnophis_elegans	NC_045558.1	-sfn	30104	gc	4-snakes-2021.hal	ZW
