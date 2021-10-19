@@ -62,7 +62,7 @@ while read chunk;do
 
     # If not masking CpG sites
     if [ "$cpg_mask" != true ]; then
-       printf "maf_parse --features $regions_to_mask -M $ref_name $input_maf --seqs $(cat $species_file) | $add_a_string | python keep_species_XYA-synteny.py -l $species_file -b $output_bed -c ../data/Species_to_chromosomes.txt $lex $argA > $output_maf \n" >> qu/filter.$chrom.$ref_name.$spname.sh;
+       printf "maf_parse --features $regions_to_mask -M $ref_name $input_maf --seqs $(cat $species_file) | $add_a_string | python filter_PARs.py -l $species_file -p ../data/Species_to_PARs.tsv | python keep_species_XYA-synteny.py -l $species_file -b $output_bed -c ../data/Species_to_chromosomes.txt $lex $argA > $output_maf \n" >> qu/filter.$chrom.$ref_name.$spname.sh;
     fi;
        
     # 6 replicates of phylofit, only if filtered sequence >= 10kb

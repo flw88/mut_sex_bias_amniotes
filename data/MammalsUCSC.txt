@@ -1,0 +1,1 @@
+Bos_taurus,Sus_scrofa,Ovis_aries,Saimiri_boliviensis,Callithrix_jacchus,Pongo_abelii,Homo_sapiens,Nomascus_leucogenys,Macaca_mulatta,Felis_catus,Canis_lupus_familiaris,Oryctolagus_cuniculus,Rattus_norvegicus,Mus_musculus,Ceratotherium_simum_cottoni,Equus_caballus

@@ -86,7 +86,7 @@ AppendSpecies <- function(dat, keep.sp, so, subset.nm){
 
 # Mammals
 out.dat <- data.table()
-exp.str <- "Mammals"
+exp.str <- "AllMammals"
 fn <- str_interp("${dir}/data/${exp.str}.txt")
 keep.sp <- GetSpeciesNoOutgroup(fn, exp.str, outgroup.tab, time.unmap.sp)
 out.dat <- AppendSpecies(out.dat, keep.sp, exp.str, exp.str)
@@ -120,7 +120,7 @@ out.dat <- rbindlist(list(out.dat, cur.dat))
 out.dat[, MutPerYearUCSC     := SubrateUCSC     / DivTime]
 
 #### WRITE RESULTS #####
-fwrite(out.dat, file=str_interp("${dir}/data/subrate_div_data.txt"),
+fwrite(out.dat, file=str_interp("${dir}/data/subrate_div_data_allMammals.txt"),
        sep="\t", col.names=TRUE)
 
 

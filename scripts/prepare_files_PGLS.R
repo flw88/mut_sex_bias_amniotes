@@ -11,7 +11,8 @@ suppressMessages( library(stringr) )
 opt.spec <- matrix(c("help",         "h",  0,  "logical",   0, 
                      "ref.species",  "r",  1,  "character", 1, 
                      "exp.name",     "c",  1,  "character", 1,
-                     "out.exp",      "o",  1,  "character", 1
+                     "out.exp",      "o",  1,  "character", 1,
+                     "overwrite",    "w",  0,  "logical",   0
 ), byrow=TRUE, ncol=5)
 opt <- getopt(opt.spec[,1:4])
 req.args <- opt.spec[as.logical(as.integer(opt.spec[,5])), 1]
@@ -19,13 +20,14 @@ req.args <- opt.spec[as.logical(as.integer(opt.spec[,5])), 1]
 main.dir <- "/moto/palab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
 
 ###--- Run this commented block to test locally ---#
-main.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
-opt <- list(ref.species="Homo_sapiens",
-            experiment.name="Mammals",
-            out.exp="Mammals")
+# main.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
+# opt <- list(ref.species="Gallus_gallus",
+#             exp.name="Aves",
+#             out.exp="Aves_g1,Aves_g2,Aves_g3,Aves_g4,Aves_g5,Aves_g6")
 ###--------------------------------------------#
 
 scripts.dir <- str_interp("${main.dir}/scripts")
+data.dir    <- str_interp("${main.dir}/data")
 pgls.dir    <- str_interp("${main.dir}/pgls_files")
 alpha.dir   <- str_interp("${scripts.dir}/alphas")
 
@@ -41,117 +43,49 @@ for(arg in req.args){
   }
 }
 
+if(is.null(opt$overwrite)){
+  opt[["overwrite"]] <- FALSE
+}
+
 ref.species <- opt$ref.species
-experiment.name <- opt$experiment.name
+exp.name <- opt$exp.name
 out.exp <- opt$out.exp # Output experiments. Sub groupings of a particular order
 out.exp <- str_split(out.exp, ",")[[1]]
+overwrite <- opt$overwrite
 
 ##### Set up file names #####
-if(experiment.name != "Mammals"){
-  stop("Currently can only handle 'Mammals' right now")
+if(exp.name != "Aves"){
+  stop("Currently only needed to run 'Aves' right now")
 }
 
-replace.file     <- str_interp("${pgls.dir}/replace_species.txt")
-output.file      <- str_interp("${pgls.dir}/${experiment.name}.csv")
-tree.file        <- str_interp("${main.dir}/trees/241-mammalian-2020v2.phast-242.nh")
-alpha.file       <- str_interp("${main.dir}/data/XA_2exposure-model_alphas.csv")
-sr.file          <- str_interp("${pgls.dir}/subrate_div_data.txt")
-
-# anage.file       <- str_interp("${pgls.dir}/anage_data.txt")
-# anage.hdr.file   <- str_interp("${pgls.dir}/anage_simplified_header.txt")
-# qual.file        <- str_interp("${main.dir}/data/zoonomia_assembly_metadata.csv")
-# gl.file          <- str_interp("${main.dir}/data/XA_2exposure-model_alphas.csv")
-
-##### Load alpha, tree data #####
-# Read alpha estimates & nwk tree
-alpha.dat <- fread(alpha.file)
-
-ucsc.tree <- keep.tip(read.tree(tree.file), c(alpha.dat$species))
-
-##### Load genome assembly quality data #####
-# qual <- fread(qual.file)
-# qual.cols <- c("Species", "AssemblyStatus", "Coverage", "ContigN50", "ScaffoldN50")
-
-##### Load life history data #####
-# # AnAge database
-# anage <- fread(anage.file, sep="\t", header = TRUE, col.names=readLines(anage.hdr.file))
-# anage[, FullSpecies := str_c(Genus, Species, sep="_")]
-
-# Generation time and predicted alpha
-# gl <- fread(gl.file, sep=",")
-# setnames(gl, "Species", "FullSpecies")
-# gl[, c("V1", "Order", "Family", "Genus") := NULL] # Delete unneeded columns
-
-##### Load sub rate data file #####
-# Subrate
-# sr <- fread(sr.file)
-# setnames(sr, "Species", "FullSpecies")
-# sr <- sr[Subset=="thinned", .(FullSpecies, MutPerYearUCSC)]
-# sr[, mutrate_yearly := MutPerYearUCSC / 1e6]
-
-##### Fill in missing info #####
-# # If species are missing use closely related species data (if present)
-# replace.species <- fread(replace.file, header=TRUE, na.strings="NaN")
-# 
-# # Merge alpha and replace.species tables
-# alpha.traits <-  merge(alpha.dat, replace.species, by="Species", all.x=TRUE)
-# setnames(alpha.traits, "Species", "FullSpecies")
-# 
-# # Merge alpha and quality data based on species names
-# alpha.traits <- merge(alpha.traits, qual[, qual.cols, with=FALSE], by.x="FullSpecies", by.y="Species", all.x=TRUE)
-# 
-# # Merge alpha and AnAge data based on species names
-# alpha.traits <- merge(alpha.traits, anage, by.x="anage_Species", by.y="FullSpecies", all.x=TRUE)
-# 
-# # Merge alpha and subrate data based on species names
-# alpha.traits <- merge(alpha.traits, sr, by="FullSpecies", all.x=TRUE)
-# 
-# # Merge alpha and generation length data based on species names
-# alpha.traits <- merge(alpha.traits, gl, by.x="gl_Species", by.y="FullSpecies", all.x=TRUE)
-# 
-# setkey(alpha.traits, FullSpecies)
-
-# Add some remaining missing info for Homo Sapiens (30y gen time)
-# alpha.traits["Homo_sapiens", GenerationLength_d := 30*365]
-
-# Add metabolic rate per gram
-# alpha.traits[, Metabolic_rate_gram := Metabolic_rate / Adult_weight]
-
-##### Report how many species required values from closely related species #####
-for(i in c("anage", "gl")){
-  cur.col <- str_c(i, "_Species")
-  n.replace <- alpha.traits[!is.na(get(cur.col)), sum(FullSpecies != get(cur.col))]
-  n.miss <- alpha.traits[, sum(is.na(get(cur.col)))]
-  cat(str_interp("${i} dataset: ${n.replace} species replaced, ${n.miss} missing\n"))
-}
-x <- alpha.traits[, sum(is.na(anage_Species) & is.na(gl_Species))]
-cat(str_interp("${x} species lack any trait data\n"))
-
-
-##### Compute divergence from nearest species in order, nearest chromosome level assembly #####
-MinDiv2Tips <- function(phy, target.tip, comparison.tips){
-  div.vals <- c()
-  if(target.tip %in% comparison.tips){
-    out.list <- list("tip"=target.tip, "div"=0)
+out.fn <- str_interp("${data.dir}/Aves_metadata_and_alphas.csv")
+if(file.exists(out.fn)){
+  if(overwrite){
+    cat(str_interp("This script will overwrite ${out.fn}\n"))
   } else {
-    for(i in comparison.tips){
-      div.vals[i] <- sum(keep.tip(phy, c(target.tip, i))$edge.length)
-    }
-    
-    j <- which.min(div.vals)
-    out.list <- list("tip"=comparison.tips[j], "div"=unname(div.vals[j]))
+    stop(str_interp("Stopping script so as not to overwrite ${out.fn}"))
   }
-  
-  return(out.list)
 }
 
-chrom.level.sp <- alpha.traits[AssemblyStatus == "Chromosome", FullSpecies]
-alpha.traits[, c("Nearest_chrom_assembly", "Divergence_to_NCA") := MinDiv2Tips(ucsc.tree, FullSpecies, chrom.level.sp), by=FullSpecies]
+alpha.fn <- str_interp("${scripts.dir}/alphas/${exp.name}.${ref.species}.LM.tsv")
+gen.fn <- str_interp("${data.dir}/Aves_traits.tsv")
+meta.fn <- str_interp("${data.dir}/Aves_assembly_metadata.csv")
 
+##### LOAD DATA #####
+a.dat <- fread(alpha.fn)
+g.dat <- fread(gen.fn)
+m.dat <- fread(meta.fn)
+m.dat <- m.dat[!duplicated(Species)]
+
+##### JOIN DATA #####
+a.dat <- a.dat[mut_type == "mod"]
+
+a.dat <- merge(a.dat, g.dat, by.x="species", by.y="Species")
+a.dat <- merge(a.dat, m.dat, by.x="species", by.y="Species")
+
+##### ADD COLUMN #####
+a.dat[, GenerationLength_d := `Generation time (years)` * 365]
 
 ##### Write table to output #####
 # Output file
-fwrite(alpha.dat, file=output.file, sep=",")
-
-
-
+fwrite(a.dat, file=out.fn, sep=",", quote=TRUE)

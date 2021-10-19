@@ -1,0 +1,6 @@
+Aves_g1.Gallus_gallus	Gallus_gallus
+Aves_g2.Gallus_gallus   Gallus_gallus
+Aves_g3.Gallus_gallus   Gallus_gallus
+Aves_g4.Gallus_gallus   Gallus_gallus
+Aves_g5.Gallus_gallus   Gallus_gallus
+Aves_g6.Gallus_gallus   Taeniopygia_guttata

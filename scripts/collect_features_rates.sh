@@ -28,7 +28,7 @@ while read chunk;do
 
     # Important files
     bed_file="$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.bed";
-    bed_file=$(echo $bed_file | sed 's/Aves_g[1-9]/Aves/g');
+    bed_file=$(echo $bed_file | sed 's/Aves_g[1-9]/Aves/g' | sed 's/Serpentes5/Serpentes/g');
     tr_tab="tr '\n' '\t'"
     cmd="";
 
@@ -117,6 +117,7 @@ while read chunk;do
     if [ -z "$cmd" ];then trail=""; else trail=" | $tr_tab;";fi
         maf="$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.maf";
 	maf=$(echo $maf | sed 's/Aves_g[1-9]/Aves/g');
+	maf=$(echo $maf | sed 's/Serpentes5/Serpentes/g');
         cmd=$(echo $cmd" $trail cat $maf | python gc_content_from_maf.py -s ../data/${spname}.txt");
     fi;
 

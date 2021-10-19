@@ -30,7 +30,8 @@ scripts.dir <- "/moto/palab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes
 ###--- Run this commented block to test locally ---#
 # scripts.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes/scripts"
 # opt <- list(ref.species="Gallus_gallus",
-#          exp.name="Aves"
+#             exp.name="Aves",
+#             out.exp="Aves_g1,Aves_g2,Aves_g3,Aves_g4,Aves_g5,Aves_g6"
 #      )
 ###--------------------------------------------#
 
@@ -52,31 +53,42 @@ out.exp <- opt$out.exp # Output experiments. Sub groupings of a particular order
 out.exp <- str_split(out.exp, ",")[[1]]
 
 ##### LOAD DATA #####
+outgrp.dat <- fread(str_interp("${scripts.dir}/../data/outgroups.txt"), header=FALSE,
+                    col.names=c("Comparison", "Outgroup"))
+
 tmp.lm <- NULL
 if(length(out.exp) > 1){
   for(oe in out.exp){
     cur.fn <- str_interp("${scripts.dir}/lm_res/${oe}.${ref.species}.RData")
     load(cur.fn)
     
+    outgrp <- outgrp.dat[Comparison == str_c(oe, ".", ref.species), Outgroup]
+    
     if(is.null(tmp.lm)){
       tmp.lm <- lm.list
       tmp.coef <- samp.coef.list
+      tmp.alpha <- alpha.dat[]
     } else {
       for(j in names(lm.list)){
+        tmp.alpha <- rbindlist(list(tmp.alpha, alpha.dat))
         for(k in names(lm.list[[j]])){
+          if(k == outgrp){ next }
           tmp.lm[[j]][[k]]   <- lm.list[[j]][[k]]
           tmp.coef[[j]][[k]] <- samp.coef.list[[j]][[k]]
         }
       }
     }
   }
+  
   lm.list <- tmp.lm
   samp.coef.list <- tmp.coef
+  alpha.dat <- tmp.alpha[]
+  rm(tmp.lm, tmp.coef, tmp.alpha)
 } else {
   load(str_interp("${scripts.dir}/lm_res/${exp.name}.${ref.species}.RData"))
 }
 
-# Get orderr information
+# Get order information
 order.dat <- data.table(Species = names(lm.list$mod), Order="all")
 if(exp.name == "Mammals"){
   meta.dat <- fread(str_interp("${scripts.dir}/../data/zoonomia_assembly_metadata.csv")) # Information on orders
@@ -84,8 +96,10 @@ if(exp.name == "Mammals"){
                               meta.dat[Species %in% names(lm.list$mod), .(Species, Order)]))
 } else if(length(out.exp) > 1){
   for(oe in out.exp){
+    outgrp <- outgrp.dat[Comparison == str_c(oe, ".", ref.species), Outgroup]
+    
     cur.sp <- str_split(readLines(str_interp("${scripts.dir}/../data/${oe}.txt")), ",")[[1]]
-    order.dat <- rbindlist(list(order.dat, data.table(Species=cur.sp, Order=oe)))
+    order.dat <- rbindlist(list(order.dat, data.table(Species=setdiff(cur.sp, outgrp), Order=oe)))
   }
 }
 
@@ -115,6 +129,7 @@ TestAlphaConstancy <- function(lm.list, samp.coef.list, feat.vars, targ.rate.rat
     
     x.rows <- lm.obj$model$region == "XZ"
     feat.values <- list()
+    
     for(i in feat.vars){
       feat.values[[i]] <- rep(mean(lm.obj$model[x.rows, i]), 2)
     }
@@ -129,6 +144,11 @@ TestAlphaConstancy <- function(lm.list, samp.coef.list, feat.vars, targ.rate.rat
     
     resamp.ratios <- resamp.rates["XZ",] / resamp.rates["A",]
     p <- sum(targ.rate.ratio > resamp.ratios) / length(resamp.ratios)
+    # if(sp == "Aptenodytes_forsteri"){
+    #   print(feat.values)
+    #   print(resamp.rates)
+    #   print(targ.rate.ratio)
+    # }
     if(p > 0.5){ p <- 1 - p }
     
     p.dat[[sp]] <- data.table(species=sp, pval=p, xz_a_comparison=targ.rate.ratio)
@@ -178,7 +198,7 @@ log.break <- floor(log10(min(pval.dat[pval != 0, pval]))) # Where to switch log 
 x.trans <- scales::pseudo_log_trans(sigma=10^log.break, base=10)
 
 lab.dat <- pval.dat[, .(a  = sprintf("H0: alpha = %0.2f", alpha_comparison[1]), 
-                        small_p_species = sprintf("Species with p=0:\n%s", StringifySpecies(common[pval==0])),
+                        small_p_species = sprintf("Species with p<0.002:\n%s", StringifySpecies(common[pval==0])),
                         n_small_p = sum(pval == 0)), by=order]
 lab.dat[(n_small_p == 0), small_p_species := "Species with p=0:\n[none]"]
 lab.dat[, label := str_c(a, "\n", small_p_species)]
@@ -190,7 +210,7 @@ n.col <- ceiling(n.orders / n.row)
 if(length(unique(pval.dat$order)) > 1){
   p <- ggplot(aes(x=pval), data=pval.dat[order != "all"]) + 
     geom_histogram(fill=hist.col) +
-    geom_label(aes(x = Inf, y = Inf, label=label), data=lab.dat[order != "all"], hjust=1, vjust=1, color="black") +
+    geom_label(aes(x = Inf, y = Inf, label=label), data=lab.dat[order != "all"], hjust=1, vjust=1, color="black", alpha=0.85) +
     scale_x_continuous(trans=x.trans, breaks=c(0, 10^c(log.break:0))) +
     facet_wrap(vars(order), nrow=n.row) +
     theme(axis.text.x = element_text(angle=45, hjust=1))
@@ -201,9 +221,11 @@ if(length(unique(pval.dat$order)) > 1){
 # all
 p <- ggplot(aes(x=pval), data=pval.dat[order == "all"]) + 
   geom_histogram(fill=hist.col) +
-  geom_label(aes(x = Inf, y = Inf, label=label), data=lab.dat[order == "all"], hjust=1, vjust=1, color="black", size=2.5) +
+  geom_label(aes(x = Inf, y = Inf, label=label), data=lab.dat[order == "all"], hjust=1, vjust=1, color="black", size=2.5, alpha=0.85) +
   scale_x_continuous(trans=x.trans, breaks=c(0, 10^c(log.break:0))) +
+  coord_cartesian(xlim=c(0,1), ylim=c(0,4)) + 
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
-ggsave(p, file=str_interp("${scripts.dir}/pdfs/${exp.name}.${ref.species}.pvals_all.pdf"), width=4, height=3)
+ggsave(p, file=str_interp("${scripts.dir}/pdfs/${exp.name}.${ref.species}.pvals_all.pdf"), 
+       width=4, height=2.5)
 
