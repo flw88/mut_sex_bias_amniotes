@@ -1,0 +1,7 @@
+Species,Paternal,Maternal,Total,Stage,Parental_age
+Mus_musculus,27,20,140,Early_embryonic,0.73
+Mus_musculus,107,25,434,PostPGCS,0.73
+Homo_sapiens,373,362,778,Early_embryonic,31.62667
+Homo_sapiens,4201,1135,24975,PostPGCS,31.62667
+Bos_taurus,21,27,48,Early_embryonic,5
+Bos_taurus,124,32,156,PostPGCS,5
