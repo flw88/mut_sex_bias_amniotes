@@ -1,0 +1,8 @@
+x	xlog	y	ylog	rm_species	trait_type
+Generation_time_y	True	Alpha	False	NA	other
+AssemblyStatus	False	Alpha	False	NA	gnmstat
+Divergence_to_NCA	False	Alpha	False	NA	gnmstat
+ContigN50	True	Alpha	False	NA	gnmstat
+ScaffoldN50	True	Alpha	False	NA	gnmstat
+#Inverse_GenLength	False	Alpha	False	NA	other
+Generation_time_y	True	Xz_a	False	NA	other

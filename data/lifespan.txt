@@ -1,0 +1,10 @@
+species,common_name,lifespan
+Bos_taurus,Domestic cattle,20
+Felis_catus,Domestic cat,18
+Callithrix_jacchus,White-tufted-ear marmoset,22.8
+Macaca_mulatta,Rhesus monkey,40
+Microcebus_murinus,Gray mouse lemur,18.2
+Gorilla gorilla,Gorilla,60.1
+Homo_sapiens,Human,83
+Pan_troglodytes,Chimpanzee,50
+Mus_musculus,House mouse,3.7

@@ -1,0 +1,16 @@
+species,common_name,muts_per_year,genome_size
+Mus_musculus,Mouse,796.2354,2.7
+Rattus_norvegicus,Rat,664.2353,2.6
+Mustela_putorius,Ferret,496.2354,2.5
+Oryctolagus_cuniculus,Rabbit,217.4118,2.7
+Canis_lupus,Dog,249.5075,2.3
+Felis_catus,Cat,297.8604,2.4
+Panthera_tigris,Tiger,212.0956,2.4
+Bos_taurus,Cattle,204.6840,2.7
+Panthera_leo,Lion,159.9693,2.2
+Giraffa_tippelskirchi,Giraffe,99.2634,2.4
+Colobus_angolensis,BW colobus,80.2046,3
+Heterocephalus_glaber,N mole-rat,93.2634,2.6
+Lemur_catta,RT lemur,103.5576,2.2
+Equus_caballus,Horse,128.9105,2.5
+Homo_sapiens,Human,48.7721,3.1

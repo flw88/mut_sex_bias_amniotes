@@ -1,0 +1,4 @@
+x	xlog	y	ylog	rm_species	trait_type
+Predicted_alpha_dnms	False	Alpha_dnm	False	Microcebus_murinus	other
+Predicted_alpha_dnms_min2trios	False	Alpha_dnm	False	Microcebus_murinus,Callithrix_jacchus,Pongo_abelii	other
+Predicted_alpha_dnms_min8trios	False	Alpha_dnm	False	Microcebus_murinus,Callithrix_jacchus,Pongo_abelii,Felis_catus,Gorilla_gorilla,Aotus_nancymaae	other
