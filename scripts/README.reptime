@@ -1,0 +1,6 @@
+while read line;do \
+  read order out_exp ref chrX param seed feature hal sexchrom <<<$(echo $line);
+  for group in $(echo $out_exp | tr "," "\n");do
+    bash collect_features_rates.sh -w region_files/$ref.1Mb.bed -r $ref -c $group $param -t;
+  done;
+done < <(grep Homo_sapiens config_file.txt)
