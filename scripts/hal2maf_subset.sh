@@ -27,13 +27,13 @@ while read chunk;do
     cmd=$(echo $cmd"hal2maf $hal_dir/$hal_file $maf_path/$ref_name/$chrom/$chrom.$start.$end.$spname.maf --targetGenomes $(cat $species_file) --refGenome $ref_name --refSequence $chrom --onlyOrthologs --noDupes --start $start --length $l --noAncestors;>&2 echo '$chrom.$start.$end.$spname';");
     let "counter++";
     if (( $counter % $job_grouping == 0 ));then
-	sbatch --account="palab" -t 11:55:00 -c 1 -J $ref_name.$counter.$spname -o out/$ref_name.$chrom.$counter.$spname --wrap="$cmd";
+	sbatch --account="palab" -t 23:55:00 -c 1 -J $ref_name.$counter.$spname -o out/$ref_name.$chrom.$counter.$spname --wrap="$cmd";
 	cmd="";
     fi;
 done < $region_file;
 
 # Also last commands if necessary
 if (( $counter % $job_grouping != 0 ));then
-    sbatch --account="palab" -t 11:55:00 -c 1 -J $ref_name.$counter.$spname -o out/$ref_name.$chrom.$counter.$spname --wrap="$cmd";
+    sbatch --account="palab" -t 23:55:00 -c 1 -J $ref_name.$counter.$spname -o out/$ref_name.$chrom.$counter.$spname --wrap="$cmd";
 fi;
 

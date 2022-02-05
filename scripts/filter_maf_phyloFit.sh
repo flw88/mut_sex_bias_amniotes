@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Arguments for script
-while getopts w:l:r:c:o:x:y:n:ma flag
+while getopts w:l:r:c:o:x:y:n:s:ma flag
 do
     case "${flag}" in
         w) region_file=${OPTARG};;  # Bed files with coordinates of windows to extract
@@ -12,6 +12,7 @@ do
     x) chrX=${OPTARG};;  # String for chrX in reference sequence
     y) chrY=${OPTARG};;  # String for chrY in reference sequence
     n) newick_file=${OPTARG};; # Newick file for phylofit runs
+    s) region_suffix=${OPTARG};; # Suffix for filtering file
     m) cpg_mask='true';; # Filter positions that are CpG sites in any species
     a) all_align='true';; # All species must align
     esac
@@ -34,7 +35,7 @@ while read chunk;do
     read chrom start end <<<$(echo $chunk);
     mkdir -p $maf_output_path/$ref_name/$chrom;
     
-    # If current chromsome is the X/Z
+    # If current chromosome is the X/Z
     if [ "$chrom" == "$chrX" ];then 
         lex="-X";
     elif [ "$chrom" == "$chrY" ]; then
@@ -46,24 +47,18 @@ while read chunk;do
     # If requiring that all species align to keep sequence
     if [ "$all_align" == true ]; then argA="-a"; else argA=""; fi;
 
+    # If masking CpGs
+    if [ "$cpg_mask" == true ]; then cpgmask="-c"; else cpgmask=""; fi;
+    
     # Useful variables for the command
-    regions_to_mask=$region_path/$ref_name/$ref_name.$chrom.exons-1kb-pad_rmsk.bed;
+    regions_to_mask=$region_path/$ref_name/$ref_name.$chrom.$region_suffix.bed;
     input_maf=$maf_path/$ref_name/$chrom/$chrom.$start.$end.$spname.maf;
     output_maf=$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.maf;
     output_bed=$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.bed;
     add_a_string="cat - <(printf 'a Just so the python filtering script processes the last alignment block')" # Python script relies on 'a' at the start of line to process an alignment block, so we add one at the end of the file to process the last block
 
-    # If masking CpG sites
-    if [ "$cpg_mask" == true ]; then
-	output_cpg_bed=$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.mask.CpGs.bed;
-	echo "cat <(cat $input_maf) <(printf 'a Just so the python filtering script processes the last alignment block') | python find_CpGs_fast.py -r $ref_name -s $(cat $species_file) > $output_cpg_bed" >> qu/filter.$chrom.$ref_name.$out_spname.sh;
-	printf "maf_parse --features <(cat $output_cpg_bed $regions_to_mask | bedtools sort -i - | bedtools merge -i - ) -M $ref_name $input_maf --seqs $(cat $species_file) | $add_a_string | python keep_species_XYA-synteny.py -l $species_file -b $output_bed -c ../data/Species_to_chromosomes.txt $lex $argA > $output_maf \n" >> qu/filter.$chrom.$ref_name.$spname.sh;
-    fi;
-
-    # If not masking CpG sites
-    if [ "$cpg_mask" != true ]; then
-       printf "maf_parse --features $regions_to_mask -M $ref_name $input_maf --seqs $(cat $species_file) | $add_a_string | python filter_PARs.py -l $species_file -p ../data/Species_to_PARs.tsv | python keep_species_XYA-synteny.py -l $species_file -b $output_bed -c ../data/Species_to_chromosomes.txt $lex $argA > $output_maf \n" >> qu/filter.$chrom.$ref_name.$spname.sh;
-    fi;
+    # Filtering
+    printf "maf_parse --features $regions_to_mask -M $ref_name $input_maf --seqs $(cat $species_file) | $add_a_string | python filter_PARs_micros_CpGs.py -l $species_file -p ../data/Species_to_PARs.tsv -m ../data/Species_to_micros.tsv $cpgmask | python keep_species_XYA-synteny.py -l $species_file -b $output_bed -c ../data/Species_to_chromosomes.txt $lex $argA > $output_maf \n" >> qu/filter.$chrom.$ref_name.$spname.sh;
        
     # 6 replicates of phylofit, only if filtered sequence >= 10kb
     for out_spname in $(echo $out_spname_list | tr "," "\n");do 

@@ -49,7 +49,7 @@ runPGLS <- function(d, xvar, yvar, xlog, ylog, phylogeny, lambda, kappa, delta){
 
 # PIC pairwise
 # Function to produce PICs based on pairwise comparison of tips only
-# (no ancestral node reconstruciton; no overlaps).
+# (no ancestral node reconstruction; no overlaps).
 # For N tips, gives N/2 PIC values (rounded down).
 # Uses a minimum distance heuristic to iteratively choose pairs.
 picPairwiseTips <- function(x, phylogeny, method="minimum"){

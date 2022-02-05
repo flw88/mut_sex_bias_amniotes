@@ -143,6 +143,12 @@ IsPoisson <- function(lm.obj){
   return(out.bool)
 }
 
+# Return boolean array of "odd" windows, ordered by chromosome size
+# Negate to get "even" values.
+OddWindows <- function(in.dat){
+  return( in.dat[, .I %% 2 == 1, by=region]$V1 )
+}
+
 ##### REGRESSION FUNCTIONS #####
 CalcModelPvalue <- function(lm.obj){
   if(IsPoisson(lm.obj)){
@@ -344,12 +350,15 @@ CalcAlpha <- function(xza.rat, g.rat=1, is.zw=FALSE){
     alph <- ((3 * xza.rat * miy.g) - 4) /
             (2 - (3 * xza.rat * miy.g))
   }
+  alph[alph < 0] <- Inf
+  
   return(unname(alph))
 }
 
 # Compute alpha from regression using mean feature values (default)
 #   or provided feature values (feat.values).
-#   Returns alpha (fit) and 95% CIs (lwr, upr)
+#   Returns alpha (alpha) w/ 95% CIs (alpha_lwr, alpha_upr) and
+#   X(Z)-A ratios (xz_a)  w/ 95% CIs (xz_a_lwr, xz_a_upr)
 AlphaFromRegression <- function(lm.obj, feat.vars, samp.coef=NULL, feat.values=NULL, g.rat=1, is.zw=FALSE){
   if(is.null(feat.values)){ # Get mean feature values across X(Z)
     x.rows <- lm.obj$model$region == "XZ"
@@ -404,6 +413,48 @@ AlphaFromRegression <- function(lm.obj, feat.vars, samp.coef=NULL, feat.values=N
   }
   
   out.res <- c(a.fit, a.ci, xza.fit, xza.ci)
+  return(out.res)
+}
+
+
+# Compute alpha just using mean across windows (default).
+#   Can be run weighted.
+#   Returns alpha (alpha) w/ 95% CIs (alpha_lwr, alpha_upr) and
+#   X(Z)-A ratios (xz_a)  w/ 95% CIs (xz_a_lwr, xz_a_upr)
+AlphaFromMean <- function(dat, subrate.col, is.zw=FALSE, weighted=FALSE, n.boot=500, sex.chrom="XZ"){
+  # Build data table
+  size.col <- str_c(subrate.col, "_den")
+  keep.col <- unname(c(subrate.col, size.col, "region"))
+  
+  reg.dat <- dat[, keep.col, with=FALSE]
+  reg.dat <- reg.dat[region %in% c("A", sex.chrom)]
+
+  # Set sub rate name, size columns
+  setnames(reg.dat, c(subrate.col, size.col), c("sub_rate", "size"))
+  
+  if(!weighted){
+    reg.dat[, size := 1]
+  }
+
+  # Function for calculating X(Z)-A ratios
+  CalcXZA <- function(in.dat, i=in.dat[,.I]){
+    tmp <- in.dat[i, weighted.mean(sub_rate, w=size), by=region]
+    xza.est <- tmp[region == "XZ", V1] / tmp[region == "A", V1]
+    return(xza.est)
+  }
+
+  # Calculate point estimates
+  xza.est <- c("xz_a"=CalcXZA(reg.dat))
+  a.est <- c("alpha"=CalcAlpha(xza.est, is.zw=is.zw))
+
+  # Calculate CIs
+  xza.ci <- ConfInt( replicate(CalcXZA(reg.dat, i=reg.dat[, sample(.I, replace=TRUE), by=region]$V1), n=n.boot) )
+  names(xza.ci) <- c("xz_a_lwr", "xz_a_upr")
+
+  a.ci <- sort(CalcAlpha(xza.ci, is.zw=is.zw))
+  names(a.ci) <- c("alpha_lwr", "alpha_upr")
+
+  out.res <- c(a.est, a.ci, xza.est, xza.ci)
   return(out.res)
 }
 

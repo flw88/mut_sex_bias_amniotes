@@ -19,30 +19,28 @@ suppressMessages( library(RColorBrewer) )
 
 ##### Get options #####
 opt.spec <- matrix(c("help",         "h",  0,  "logical",   0, 
-                     "ref.species",  "r",  1,  "character", 1, 
                      "exp.name",     "c",  1,  "character", 1,
-                     "out.exp",      "o",  1,  "character", 1
+                     "ee.mut",       "e",  1,  "character", 1  # How many early embryonic mutations to test for
 ), byrow=TRUE, ncol=5)
 opt <- getopt(opt.spec[,1:4])
 req.args <- opt.spec[as.logical(as.integer(opt.spec[,5])), 1]
 
-main.dir <- "/moto/palab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
+# main.dir <- "/moto/palab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
 
 ###--- Run this commented block to test locally ---#
 main.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
-# opt <- list(ref.species="Gallus_gallus",
-#             exp.name="Aves",
-#             out.exp="Aves_g1,Aves_g2,Aves_g3,Aves_g4,Aves_g5,Aves_g6")
-opt <- list(ref.species="Homo_sapiens",
-            exp.name="Mammals",
-            out.exp="Mammals")
+# opt <- list(exp.name="Birds", ee.mut="5")
+# opt <- list(exp.name="Mammals", ee.mut="5")
+
 ###--------------------------------------------#
 
 scripts.dir <- str_interp("${main.dir}/scripts")
+data.dir    <- str_interp("${main.dir}/data")
 pgls.dir    <- str_interp("${main.dir}/pgls_files")
-alpha.dir   <- str_interp("${scripts.dir}/alphas")
 
-if( !is.null(opt$help) || (length(opt) == 1) ) {
+source(str_interp("${scripts.dir}/PGLS.funcs.R"))
+
+if( !is.null(opt$help) || (length(opt) == 0) ) {
   cat(getopt(opt.spec, usage=TRUE))
   quit(status=1)
 }
@@ -54,234 +52,76 @@ for(arg in req.args){
   }
 }
 
-ref.species <- opt$ref.species
+
 exp.name <- opt$exp.name
-out.exp <- opt$out.exp # Output experiments. Sub groupings of a particular order
-out.exp <- str_split(out.exp, ",")[[1]]
+ee.mut <- as.integer(opt$ee.mut)
+# out.exp <- opt$out.exp # Output experiments. Sub groupings of a particular order
+# out.exp <- str_split(out.exp, ",")[[1]]
+# covariate <- opt$covariate
+
 
 ##### Set up file names #####
+alpha.file <- str_interp("${data.dir}/Table_S2.csv")
 if(exp.name == "Mammals"){
-  alpha.file  <- str_interp("${main.dir}/data/XA_2exposure-model_alphas.csv")
+  # alpha.file  <- str_interp("${main.dir}/data/XA_2exposure-model_alphas.csv")
   tree.file   <- str_interp("${main.dir}/trees/mammals241.TimeTree.nwk")
   phast.file  <- str_interp("${main.dir}/trees/241-mammalian-2020v2.phast-242.nh")
-} else if(exp.name == "Aves"){
-  alpha.file  <- str_interp("${main.dir}/data/Aves_metadata_and_alphas.csv")
-  tree.file   <- str_interp("${main.dir}/trees/Aves.TimeTree.nwk")
+} else if(exp.name == "Birds"){
+  # alpha.file  <- str_interp("${main.dir}/data/Birds_metadata_and_alphas.csv")
+  tree.file   <- str_interp("${main.dir}/trees/Birds.TimeTree.nwk")
   phast.file  <- str_interp("${main.dir}/trees/363-avian-2020-phast.nh")
 } else {
-  stop("Currently can only handle 'Mammals' and 'Aves' right now")
+  stop("Currently can only handle 'Mammals' and 'Birds' right now")
 }
 
-nm.map.file <- str_interp("${main.dir}/trees/TimeTree.spname_map.tab")
-config.file <- str_interp("${scripts.dir}/pgls_config_file.txt")
-latin.file  <- str_interp("${main.dir}/data/latin2common.txt")
-
-anage.file     <- str_interp("${pgls.dir}/anage_data.txt")
-anage.hdr.file <- str_interp("${pgls.dir}/anage_simplified_header.txt")
-impute.file    <- str_interp("${pgls.dir}/impute_species.txt")
+# nm.map.file <- str_interp("${main.dir}/trees/TimeTree.spname_map.tab")
+config.file <- str_interp("${scripts.dir}/pgls_config_file.${exp.name}.txt")
 
 colors.file    <- str_interp("${main.dir}/data/plot_colors.tsv")
 
+out.prefix <- str_interp("${scripts.dir}/pgls_res/Me${ee.mut}/${exp.name}")
+
 # where to cat output to
-cat.file    <- str_interp("${scripts.dir}/pgls_res/${exp.name}.output.txt")
+cat.file    <- str_interp("${out.prefix}.output.txt")
 cat("", file=cat.file, append=FALSE)
 
 ##### Load data #####
 # Read input files
-alpha <- fread(alpha.file, sep=",")
+alpha <- fread(alpha.file, sep=",", header=TRUE, na.strings=c("NaN", "", "Na", "NA", "."))
+# setnames(alpha, "G", "Generation_time_y")
+alpha <- alpha[Group == exp.name]
 full.tree <- read.tree(tree.file)
 phast.tree <- read.tree(phast.file)
 
-latin.dat <- fread(latin.file)
-setkey(latin.dat, Species)
 
-anage <- fread(anage.file, sep="\t", header=TRUE, 
-               col.names=readLines(anage.hdr.file))
-anage[, FullSpecies := str_c(Genus, Species, sep="_")]
-setkey(anage, FullSpecies)
-
-impute.dat <- fread(impute.file)
-setkey(impute.dat, Species)
 
 # Replace Alignment species with close timetree equivalent
-nm.map <- fread(nm.map.file)
-for(i in 1:nrow(nm.map)){
-  sp.t <- nm.map[i, TimeTree]
-  sp.z <- nm.map[i, Alignment]
-  if(is.na(sp.t)){
-    next
-  }
+for(i in 1:nrow(alpha)){
+  sp.t <- alpha[i, TimeTree_Species]
+  sp.s <- alpha[i, Species]
   
-  full.tree$tip.label[which(full.tree$tip.label == sp.t)] <- sp.z
+  if(sp.s != sp.t){
+    full.tree$tip.label[which(full.tree$tip.label == sp.t)] <- sp.s 
+  }
 }
 
 # Filter the tree to match species in alpha table
-tree.sp <- intersect(full.tree$tip.label, alpha$species)
-tree.sp <- setdiff(tree.sp, nm.map[is.na(TimeTree), Alignment])
-
-cat(str_interp("Pruning tree. Keeping ${length(tree.sp)} of ${length(alpha$species)} species in alpha table\n\n"),
-    file=cat.file, append=TRUE)
+tree.sp <- intersect(full.tree$tip.label, alpha$Species)
 tree <- keep.tip(full.tree, tree.sp)
+
 tree[["node.label"]] <- str_c("A", Ntip(tree) + (1:Nnode(tree)))
-alpha <- alpha[species %in% tree.sp,]
 
-config <- fread(config.file)
+config <- fread(cmd = str_interp("grep -v '^#' ${config.file}"))
+pca.traits     <- config[trait_type == "pca",     x]
+pred.traits    <- config[trait_type == "pred",    x]
+gnmstat.traits <- config[trait_type == "gnmstat", x]
+extra.traits   <- config[trait_type == "other",   x]
 
-##### IMPUTE ANAGE DATA IF NEEDED #####
-if(exp.name == "Mammals"){
-  alpha[, AnAge_presence := !is.na(AnAge_presence)]
-  alpha[, AnAgeSpecies := species]
-  n.impute <- alpha[, sum(!AnAge_presence)]
-  
-  cat(str_interp("\nImputing AnAge data for ${n.impute} species:\n"), file=cat.file, append=TRUE)
-  
-  imp.cols <- setdiff(intersect(names(alpha), names(anage)), c("Order", "Genus")) # Data to impute
-  for(i in alpha[, .I[!AnAge_presence]]){ # Iterate over rows to impute
-    sp <- alpha[i, species]
-    a.sp <- impute.dat[sp, anage_Species] # Species to take data from in anage dataset
-    
-    cat(str_interp("$[30s]{sp} --> ${a.sp}\n"), file=cat.file, append=TRUE)
-    
-    alpha[i, AnAgeSpecies := a.sp]
-    anage.row <- anage[a.sp,]
-    for(j in imp.cols){
-      new.val <- anage.row[[j]]
-      alpha[i, eval(j) := new.val]
-    }
-  }
-}
-
-##### Functions #####
+# Convert MutPerYearUCSC to units of per Gb per y (default per Mb)
+alpha[, MutPerYearUCSC := MutPerYearUCSC * 1e3]
 
 
 ##### Functions #####
-# Prepare data frame for PGLS
-prepareDataframe <- function(d, xvar, yvar, xlog, ylog){
-  v <- c("species", "Order", xvar, yvar)
-  subd <- d[,..v]
-  colnames(subd) <- c("Species", "Order", "xvar", "yvar")
-  subd <- as.data.frame(subd)
-  if (xlog==TRUE){
-    subd[,"xvar"] = log10(subd[,"xvar"])
-  }
-  if (ylog==TRUE){
-    subd[,"yvar"] = log10(subd[,"yvar"])
-  }
-  return(subd)
-}
-
-# PGLS
-runPGLS <- function(d, xvar, yvar, xlog, ylog, phylogeny, lambda, kappa, delta){
-  
-  subd <- prepareDataframe(d, xvar, yvar, xlog, ylog)
-  
-  subd <- subd[!is.na(subd$xvar),]
-  
-  if (nrow(subd)<3){
-    return("NA")
-  }
-  trimmed_phylogeny = keep.tip(phylogeny, subd$Species)
-  cdat <- comparative.data(data = subd, phy = trimmed_phylogeny, names.col = "Species")#,vcv=TRUE, vcv.dim=3
-  mod <- pgls(yvar ~ xvar, cdat, lambda = lambda, kappa = kappa, delta = delta)
-  
-  df_mod = list("model" = mod, "data" = subd)
-  return(df_mod)
-}
-
-# PIC pairwise
-# Function to produce PICs based on pairwise comparison of tips only
-# (no ancestral node reconstruciton; no overlaps).
-# For N tips, gives N/2 PIC values (rounded down).
-# Uses a minimum distance heuristic to iteratively choose pairs.
-picPairwiseTips <- function(x, phylogeny, method="minimum"){
-  n <- Ntip(phylogeny)
-  if(method == "random"){
-    tip1 <- sample(phylogeny$tip.label, floor(n/2), replace=FALSE)
-    tip2 <- sample(setdiff(phylogeny$tip.label, tip1), floor(n/2), replace=FALSE)
-    tip.pairs <- cbind(tip1, tip2)
-  } else if(method == "minimum"){
-    dist.mat <- dist.nodes(phylogeny)[1:n, 1:n]
-    # Set diagonal to infinity
-    diag(dist.mat) <- Inf
-    rownames(dist.mat) <- colnames(dist.mat) <- phylogeny$tip.label
-    tip.pairs <- matrix(as.character(NA), nrow=floor(n/2), ncol=2)
-    for(i in 1:nrow(tip.pairs)){ # Iterate through and take minimum tip pair
-      min.i <- which(dist.mat == min(dist.mat), arr.ind=TRUE)[1,]
-      tip.pairs[i,] <- rownames(dist.mat)[min.i]
-      mask <- !(rownames(dist.mat) %in% tip.pairs[i,])
-      dist.mat <- dist.mat[mask, mask]
-    }
-    
-  }
-  y <- x[tip.pairs[,1]] - x[tip.pairs[,2]]
-  names(y) <- apply(tip.pairs, 1, function(s) str_c(s, collapse="-"))
-  return(y)
-}
-
-# PIC Correlation
-picCor <- function(d, xvar, yvar, xlog, ylog, phylogeny, method="spearman", pic.pairwise=FALSE){
-  subd <- prepareDataframe(d, xvar, yvar, xlog, ylog)
-  subd <- subd[!is.na(subd$xvar),]
-  
-  if (nrow(subd)<3){
-    return("NA")
-  }
-  row.names(subd) <- subd$Species
-  X <- subd[,"xvar"]
-  Y <- subd[,"yvar"]
-  names(X) <- names(Y) <- row.names(subd)
-  subtree <- keep.tip(phylogeny, row.names(subd))
-  
-  if(pic.pairwise){
-    pic.X <- picPairwiseTips(X, subtree, method="minimum")
-    pic.Y <- picPairwiseTips(Y, subtree, method="minimum")
-  } else {
-    pic.X <- pic(X, subtree)
-    pic.Y <- pic(Y, subtree)
-  }
-  cor.res <- cor.test(pic.X, pic.Y, method=method)
-  return(list("PIC1"=pic.X, "PIC2"=pic.Y, "cor"=cor.res))
-}
-
-# PIC Regression
-picModel <- function(d, xvar, yvar, xlog, ylog, phylogeny){
-  
-  subd <- prepareDataframe(d, xvar, yvar, xlog, ylog)
-  subd <- subd[!is.na(subd$xvar),]
-  
-  if (nrow(subd)<3){
-    return("NA")
-  }
-  row.names(subd) <- subd$Species
-  X <- subd[,"xvar"]
-  Y <- subd[,"yvar"]
-  names(X) <- names(Y) <- row.names(subd)
-  subtree <- keep.tip(phylogeny, row.names(subd))
-  pic.X <- pic(X, subtree)
-  pic.Y <- pic(Y, subtree)
-  mod = lm(pic.Y ~ 0 + pic.X)
-  df = data.frame(pic.X, pic.Y)
-  df_mod = list("model" = mod, "data" = df)
-  return(df_mod)
-}
-
-# Extract r2 & pval
-extract_p <- function(mod, i){
-  # coef <- round(summary(mod)$coefficients[i,4], digits = 4)
-  coef <- summary(mod)$coefficients[i,4]
-  return(coef)
-}
-
-# Extract transformed variance-covariance matrix
-extract_vcm <- function(mod){
-  mx <- mod$Vt
-  sp <- mod$data$phy$tip.label
-  row.names(mx) <- sp
-  colnames(mx) <- sp
-  df <- melt(mx)
-  return(df)
-}
-
 ## PCA functions
 RotateVarimaxPCA <- function(traits, ncomp, rotate_method="varimax"){
   pca <- prcomp(traits, center=TRUE, scale=TRUE)
@@ -301,7 +141,7 @@ RotateVarimaxPCA <- function(traits, ncomp, rotate_method="varimax"){
   colnames(pcs_rotated) <- str_c("RC", 1:ncomp)
   
   pcs <- as.data.frame(pca$x[,1:ncomp])
-  pcs_rotated$species <- rownames(pcs)
+  pcs_rotated$Species <- rownames(pcs)
   pc_og_rotated <- cbind(pcs, pcs_rotated)
   
   loadings <- as.data.frame(rawLoadings)
@@ -316,13 +156,15 @@ BiplotPCA <- function(pca, loadings, latin2comm=TRUE){
   scalar <- 1
   loadings$traits <- row.names(loadings)
   colnames(loadings) <- c("C1","C2","traits")
-  colnames(pca) <- c("species", "C1", "C2")
+  colnames(pca) <- c("Species", "C1", "C2")
   if(latin2comm){
-    pca$species <- latin.dat[pca$species, Common_names]
+    for(i in seq_along(pca$Species)){
+      pca$Species[i] <- alpha[Species == pca$Species[i], Common_name]
+    }
   }
   
   gg.obj <- ggplot(data=pca, aes(x=C1, y=C2)) + 
-    geom_point() + geom_text_repel(aes(label=species)) +
+    geom_point() + geom_text_repel(aes(label=Species)) +
     geom_segment(data=loadings, 
                  aes(x=0, y=0, xend=C1*scalar, yend=C2*scalar), 
                  arrow = arrow(length = unit(0.03, "npc")),
@@ -337,25 +179,9 @@ BiplotPCA <- function(pca, loadings, latin2comm=TRUE){
   return(gg.obj)
 }
 
-# Extract data for particular comparison(s)
-GetExperimentData <- function(xy_data, experiment){
-  out.tab <- data.table()
-  for(i in experiment){
-    out.tab <- rbindlist(list(out.tab, xy_data[[i]]))
-  }
-  return(out.tab)
-}
+
 
 ##### Add extra data columns #####
-if(all(c("Metabolic_rate", "Adult_weight") %in% names(alpha))){
-  alpha[, Metabolic_rate_gram := Metabolic_rate / Adult_weight ]
-}
-
-# Put Generation Length into units of year rather than days
-alpha[, GenerationLength_d := GenerationLength_d / 365.0]
-
-# Inverse gen time
-alpha[, Inverse_GenLength := 1 - (1 / GenerationLength_d)]
 
 
 # Compute divergence from nearest species in order, nearest chromosome level assembly
@@ -375,19 +201,18 @@ MinDiv2Tips <- function(phy, target.tip, comparison.tips){
   return(out.list)
 }
 
-chrom.level.sp <- alpha[AssemblyStatus == "Chromosome", species]
-alpha[, c("Nearest_chrom_assembly", "Divergence_to_NCA") := MinDiv2Tips(phast.tree, species, chrom.level.sp), by=species]
+chrom.level.sp <- alpha[AssemblyStatus == "Chromosome", Species]
+alpha[, c("Nearest_chrom_assembly", "Divergence_to_NCA") := MinDiv2Tips(phast.tree, Species, chrom.level.sp), by=Species]
 
 
 ##### Perform PCA, plot #####
-if(exp.name == "Mammals"){
+if(length(pca.traits) > 0){
   # Choose PCA functions
-  pca_traits <- c("Adult_weight", "GenerationLength_d", "Gestation", "Birth_weight")  #
-  pca_dat <- as.data.frame(na.omit(alpha[, c("species", pca_traits), with=FALSE])) # drop NAs
+  pca_dat <- as.data.frame(na.omit(alpha[, c("Species", pca.traits), with=FALSE])) # drop NAs
   cat(str_interp("\nKeeping ${nrow(pca_dat)} of ${nrow(alpha)} species with complete trait info for PCA.\n"),
       file=cat.file, append=TRUE)
-  row.names(pca_dat) <- pca_dat$species
-  pca_dat <- log(pca_dat[, pca_traits])
+  row.names(pca_dat) <- pca_dat$Species
+  pca_dat <- log10(pca_dat[, pca.traits])
   
   rotate_method <- "varimax"
   # NB: Played around with quartimax rotation but it doesn't seem to differ all that
@@ -399,76 +224,64 @@ if(exp.name == "Mammals"){
   
   # Plot
   pca_prop_var <- summary(pca_and_varimax$pca)$importance[2,]
-  p <- BiplotPCA(pca_and_varimax$pc_rc[,c("species","PC1","PC2")], pca_and_varimax$loadings) +
+  p <- BiplotPCA(pca_and_varimax$pc_rc[,c("Species","PC1","PC2")], pca_and_varimax$loadings) +
     xlab(str_interp("Component 1 ($[0.1f]{pca_prop_var[1]*100}%)")) +
     ylab(str_interp("Component 2 ($[0.1f]{pca_prop_var[2]*100}%)"))
   print(p)
-  ggsave(p, filename=str_interp("${scripts.dir}/pgls_res/PCA.${exp.name}.pdf"), 
+  ggsave(p, filename=str_interp("${out.prefix}.PCA.pdf"), 
          width=6, height=6)
   
-  p <- BiplotPCA(pca_and_varimax$pc_rc[,c("species","RC1","RC2")], pca_and_varimax$loadings_rotated) +
+  p <- BiplotPCA(pca_and_varimax$pc_rc[,c("Species","RC1","RC2")], pca_and_varimax$loadings_rotated) +
     xlab(str_interp("${str_to_title(rotate_method)} Component 1")) +
     ylab(str_interp("${str_to_title(rotate_method)} Component 2"))
   print(p)
-  ggsave(p, filename=str_interp("${scripts.dir}/pgls_res/PCA.${exp.name}.${rotate_method}_rotated.pdf"),
+  ggsave(p, filename=str_interp("${out.prefix}.PCA.${rotate_method}_rotated.pdf"),
          width=6, height=6)
   
   # Merge PCA with alpha table
-  alpha <- merge(alpha, pca_and_varimax$pc_rc, by.x='species', by.y="species", all.x=TRUE)
+  alpha <- merge(alpha, pca_and_varimax$pc_rc, by.x='Species', by.y="Species", all.x=TRUE)
   
   # Add PCs and RCs to configuration table
-  tmp <- data.table(x=c("PC1", "PC2", "RC1", "RC2"), y="alpha", xlog=FALSE, ylog=FALSE, rm_orders="")
+  tmp <- data.table(x=c("PC1", "PC2", "RC1", "RC2"), xlog=FALSE, 
+                    y="Alpha", ylog=FALSE,
+                    rm_species=NA, trait_type="pca")
   config <- rbindlist(list(config, tmp))
-} else if(exp.name == "Aves"){
-  pca_traits <- c()
+  pca.traits <- c(pca.traits, c("PC1", "PC2", "RC1", "RC2"))
 }
 
 ##### Run PGLS & PIC #####
 xy_data <- list()
 pic_data <- list()
-models  <- c()
+models <- list()
 
 cor.method <- "spearman" # kendall or spearman
 
-gnmstat.traits <- c("Divergence_to_NCA", "ContigN50", "ScaffoldN50", "AssemblyStatus")
-if(exp.name == "Mammals"){
-  pca_traits <- c(pca_traits, "PC1", "PC2")
-  pred.traits <- c("predicted_alpha", "predicted_alpha_no_carnivora", "predicted_alpha_primates_only")
-  for(cur.trait in pred.traits){
-    if(!(cur.trait %in% names(alpha))){
-      alpha[[cur.trait]] <- alpha$predicted_alpha
-    }
+for(cur.trait in pred.traits){
+  if(!(cur.trait %in% names(alpha))){
+    alpha[[cur.trait]] <- alpha[[str_interp("Predicted_alpha_evo_Me${ee.mut}")]]
   }
-} else if(exp.name == "Aves"){
-  pred.traits <- c()
 }
 
-if(exp.name == "Mammals"){
-  extra_traits <- c("Inverse_GenLength")
-} else if(exp.name == "Aves"){
-  extra_traits <- c("GenerationLength_d", "Inverse_GenLength")
-}
-
-keep.traits <- c(pca_traits, gnmstat.traits, pred.traits, extra_traits)
 
 # Convert AssemblyStatus to integers
 alpha[, AssemblyStatus := as.factor(AssemblyStatus)]
-config[, skipped := !(x %in% keep.traits)]
+config[, skipped := FALSE]
 
 # Configure each trait variable (to be compared with alpha)
 hdr <- c("Comparison", "pgls_ml_pvalue")
 cat(str_interp("\n$[30s]{hdr[1]}   ${hdr[2]}\n"), file=cat.file, append=TRUE)
+
 for (row in config[, .I[!skipped]]){
   # X and Y
   x <- config[row, x]
   y <- config[row, y]
   xlog <- config[row, xlog]
   ylog <- config[row, ylog]
-  experiment <- x #config[row, experiment]
+  experiment <- str_c(x, ".", y)
   
-  rm.orders <- str_split(config[row, rm_orders], ",")[[1]]
+  rm.species <- str_split(config[row, rm_species], ",")[[1]]
   
-  cur.alpha <- alpha[!(Order %in% rm.orders)][]
+  cur.alpha <- alpha[!(Species %in% rm.species)][]
   
   # Run pgls and pic
   pgls_ml <- runPGLS(cur.alpha, x, y, xlog, ylog, tree, lambda="ML", kappa=1, delta=1)
@@ -482,6 +295,9 @@ for (row in config[, .I[!skipped]]){
   if(!(class(cur.alpha[[x]]) %in% c("factor", "character"))){
     pic.cor <- picCor(cur.alpha, x, y, xlog, ylog, tree, method=cor.method, pic.pairwise=FALSE)
   }
+  
+  # Ordinary least squares
+  ols <- lm(yvar ~ xvar, data=pgls$data)
   
   pgls$data$experiment <- experiment
   
@@ -497,44 +313,51 @@ for (row in config[, .I[!skipped]]){
   # And keep model info
   pgls_ml_pval <- extract_p(pgls_ml$model, 2)
   pgls_pval    <- extract_p(pgls$model   , 2)
+  ols_pval     <- extract_p(ols          , 2)
   
   pic_pval <- extract_p(pic$model, 1)
   pic_cor_pval <- pic.cor$cor$p.value
   
-  pgls_ml_rsq <- summary(pgls_ml$model)$adj.r.squared[1]
-  pgls_rsq    <- summary(pgls$model   )$adj.r.squared[1]
+  pgls_ml_rsq <- summary(pgls_ml$model)$r.squared[1]
+  pgls_rsq    <- summary(pgls$model   )$r.squared[1]
+  ols_rsq     <- summary(ols          )$r.squared[1]
   
   ml_lambda <- unname(summary(pgls_ml$model)$param["lambda"])
+  
+  # LRT for lambda=0 versus ML lambda estimate
+  ml_lambda_pval <- pgls.profile(pgls_ml$model)$ci$bounds.p[1] 
+  
   cor_rho <- unname(pic.cor$cor$estimate)
   
   cat(str_interp("$[30s]{experiment}:  $[0.4f]{pgls_ml_pval}\n"), file=cat.file, append=TRUE)
   
   pgls_ml_intercept <- coef(pgls_ml$model)[[1]]
   pgls_ml_slope <- coef(pgls_ml$model)[[2]]
+  
   pgls_intercept <- coef(pgls$model)[[1]]
   pgls_slope <- coef(pgls$model)[[2]]
   
-  models <- rbind(models, c(pgls_ml_intercept, pgls_ml_slope, 
-                            pgls_intercept, pgls_slope,
-                            pgls_ml_pval, pgls_pval, pic_pval, pic_cor_pval,
-                            pgls_ml_rsq, pgls_rsq,
-                            ml_lambda, cor_rho))
+  ols_intercept <- coef(ols)[[1]]
+  ols_slope <- coef(ols)[[2]]
+  
+  models[[experiment]] <- data.table(pgls_ml_intercept=pgls_ml_intercept, pgls_ml_slope=pgls_ml_slope, 
+                                     pgls_intercept=pgls_intercept,       pgls_slope=pgls_slope,
+                                     ols_intercept=ols_intercept,         ols_slope=ols_slope,
+                                     pgls_ml_pval=pgls_ml_pval, pgls_pval=pgls_pval, ols_pval=ols_pval,
+                                     pic_pval=pic_pval, pic_cor_pval=pic_cor_pval,
+                                     pgls_ml_rsq=pgls_ml_rsq, pgls_rsq=pgls_rsq, ols_rsq,
+                                     ml_lambda=ml_lambda, ml_lambda_pval=ml_lambda_pval, cor_rho=cor_rho,
+                                     experiment=experiment)
 }
-rm(pgls_ml_pval, pgls_pval, pic_pval, pgls_ml_rsq, ml_lambda)
+
 
 ##### Process model summary stats #####
-# Convert to data.table, add experiment code
-colnames(models) <- c("pgls_ml_intercept", "pgls_ml_slope",
-                      "pgls_intercept", "pgls_slope",
-                      "pgls_ml_pval", "pgls_pval", "pic_pval", "pic_cor_pval",
-                      "pgls_ml_rsq", "pgls_rsq",
-                      "ml_lambda", "cor_rho")
-models <- as.data.table(models)
-models[, experiment := config[!(skipped), x]]
+models <- rbindlist(models)
 
 # Compute adjusted p-value by Benjamini-Hochberg
 models[, pgls_ml_padj := p.adjust(pgls_ml_pval, "BH")]
 models[, pgls_padj    := p.adjust(pgls_pval, "BH")]
+models[, ols_padj     := p.adjust(ols_pval, "BH")]
 models[, pic_padj     := p.adjust(pic_pval, "BH")]
 
 # Create plot strings
@@ -553,199 +376,20 @@ MakeModelStr <- function(lambda.val, p.val, rsq.val, model.type = "ML", prefix="
   return(out.str)
 }
 
-# if(include_padj){
-#   models[, pgls_ml_str   := sprintf("\n ML(%s)=%0.2f,  p [adj] = %0.4f [%0.4f]", lambda_char, ml_lambda, pgls_ml_pval, pgls_ml_padj), by=experiment]
-#   models[, pgls_str    := sprintf("\n\n %s=1,  p [adj] = %0.4f [%0.4f]", lambda_char, pgls_pval, pgls_padj), by=experiment]
-# } else {
-  models[, pgls_ml_str := MakeModelStr(ml_lambda, pgls_ml_pval, pgls_ml_rsq,   "ML", prefix="\n"),     by=experiment]
-  models[, pgls_str    := MakeModelStr(        1,    pgls_pval,    pgls_rsq, "full", prefix="\n\n"), by=experiment]
-# }
+
+models[, pgls_ml_str := MakeModelStr(ml_lambda, pgls_ml_pval, pgls_ml_rsq,   "ML", prefix="\n"),     by=experiment]
+models[, pgls_str    := MakeModelStr(        1,    pgls_pval,    pgls_rsq, "full", prefix="\n\n"), by=experiment]
+
 
 # PIC stats
 models[, cor_rho_str        := sprintf("\n %s %s = %0.2f", str_to_title(cor.method), cor_char[cor.method], cor_rho)]
 models[, pic_cor_pval_str := sprintf("\n\n p = %0.4f", pic_cor_pval)]
 
 
-##### Plot life history PGLS results #####
-# ggplot theme
-theme_set(theme_bw() +
-            theme(axis.text=element_text(size=12), panel.border=element_rect(size = 1.5)))
-
-colors.tab <- fread(colors.file)
-setkey(colors.tab, "Order")
-
-default.col <- colors.tab[exp.name, Color]
-
-# Line/text colors
-c1 <- "#4363d8" # blue
-c2 <- "#e6194B" # red
-
-# lightblue <- brewer.pal(3, "Paired")[1]
-# darkblue  <- brewer.pal(3, "Paired")[2]
-
-purple <- brewer.pal("PRGn", n=3)[1]
-green  <- brewer.pal("PRGn", n=3)[3]
-
-w.factor <- 2.4 # width factor (inches)
-h.factor <- 2.5 # height factor
-
-# Function to plot PGLS results from given data, models
-PlotPGLS <- function(xy_data, models, plt.experiments=names(xy_data), plt.type="PGLS", color.by=NULL,
-                     default.color="black", x.cis=NULL, y.cis=NULL){
-  text.size <- 2.5
-  
-  nr <- round(sqrt(length(plt.experiments)))
-  nc <- ceiling(length(plt.experiments) / nr)
-  
-  plt_data <- GetExperimentData(xy_data, plt.experiments)
-  plt_data[, experiment := factor(experiment, levels=unique(experiment), labels=unique(experiment))]
-  
-  mod_data <- models[experiment %in% plt.experiments]
-  mod_data[, experiment := factor(experiment, levels=experiment, labels=experiment)]
-  
-  if(length(plt.experiments) > 1){
-    xlab.str <- "Covariate"
-  } else {
-    xlab.str <- plt.experiments
-  }
-  
-  if(!is.null(x.cis)){ # x.cis must have column names: Species, experiment, x_lwr, x_upr
-    plt_data <- merge(plt_data, x.cis, by=c("Species", "experiment"))
-  }
-  
-  if(!is.null(y.cis)){ # y.cis must have column names: Species, experiment, y_lwr, y_upr
-    plt_data <- merge(plt_data, y.cis, by=c("Species", "experiment"))
-  }
-  
-  
-  if(plt.type == "PGLS"){
-    p <-ggplot(data = plt_data, aes(x=xvar, y=yvar))
-    
-    if(!is.null(x.cis)){
-      p <- p + geom_errorbarh(aes(xmin=x_lwr, xmax=x_upr), alpha=0.5, col=default.color, height=0)
-    }
-    
-    if(!is.null(y.cis)){
-      p <- p + geom_errorbar(aes(ymin=y_lwr, ymax=y_upr), alpha=0.5, col=default.color, width=0)
-    }
-      
-    if(!is.null(color.by) && (color.by != "")){ # Color points by Order (or something else)
-      use.colors <- brewer.pal("Dark2", n=length(unique(plt_data[[color.by]])))
-      p <- p + geom_point(aes_string(col=color.by), alpha=0.9, size=1.2) + scale_color_manual(values=use.colors)
-    } else {
-      p <- p + geom_point(alpha=0.9, size=1.2, col=default.color)#"#404040")
-    }
-    p <- p +
-      geom_abline(aes(slope = pgls_ml_slope, intercept = pgls_ml_intercept), mod_data, linetype = "dashed", color=c1) + 
-      geom_abline(aes(slope = pgls_slope, intercept = pgls_intercept), mod_data, linetype = "dashed", color=c2) + 
-      geom_text(data = mod_data, color=c1, aes(label=pgls_ml_str, color="gray", x = -Inf, y = Inf),
-                hjust = 0, vjust = 1, size = text.size) +
-      geom_text(data = mod_data, color=c2, aes(label=pgls_str, color="gray", x = -Inf, y = Inf),
-                hjust = 0, vjust = 1, size = text.size) +
-      xlab(xlab.str) + ylab("Alpha")
-  } else if(plt.type == "PIC") {
-    p <-ggplot(data = plt_data, aes(PIC1, PIC2))
-    if(!is.null(color.by) && (color.by != "")){ # Color points by Order (or something else)
-      use.colors <- brewer.pal("Dark2", n=length(unique(plt_data[[color.by]])))
-      p <- p + geom_point(aes_string(col=color.by), alpha=0.8, size=1.2) + scale_color_manual(values=use.colors)
-    } else {
-      p <- p + geom_point(alpha=0.8, size=1.2, col=default.color)
-    }
-    p <- p + 
-      geom_text(data = mod_data, color="black", aes(label=cor_rho_str, color="gray", x = -Inf, y = Inf),
-                hjust = 0, vjust = 1, size = text.size) +
-      geom_text(data = mod_data, color="black", aes(label=pic_cor_pval_str, color="gray", x = -Inf, y = Inf),
-                hjust = 0, vjust = 1, size = text.size) +
-      xlab(str_interp("PIC (${xlab.str})")) + ylab("PIC (Alpha)")
-  }
-  
-  if(length(plt.experiments) > 1){
-    p <- p + facet_wrap(~experiment, nrow=nr, scales = "free_x", )
-  }
-  
-  return(list("p"=p, "nr"=nr, "nc"=nc))
-}
-
-# Plot PGLS results for PCA traits + PCs only with both ML lambda and lambda=1 results
-if(length(pca_traits) > 0){
-  cat("Plotting PCA traits PGLS\n")
-  cur.plt <- PlotPGLS(xy_data, models, pca_traits, plt.type="PGLS", default.color=default.col)
-  print(cur.plt$p)
-  ggsave(cur.plt$p, filename=str_interp("${scripts.dir}/pgls_res/PGLS.${exp.name}.pca_traits.pdf"), 
-         width=(w.factor*cur.plt$nc)+2, height=h.factor*cur.plt$nr, device=cairo_pdf)
-}
-
-# Plot PGLS results for genome quality traits
-if(length(gnmstat.traits) > 0){
-  cat("Plotting genome stat traits PGLS\n")
-  cur.plt <- PlotPGLS(xy_data, models, setdiff(gnmstat.traits, "AssemblyStatus"), plt.type="PGLS", default.color=default.col)
-  print(cur.plt$p)
-  ggsave(cur.plt$p, filename=str_interp("${scripts.dir}/pgls_res/PGLS.${exp.name}.gnmstat_traits.pdf"), 
-         width=(w.factor*cur.plt$nc)+2, height=h.factor*cur.plt$nr, device=cairo_pdf)
-}
-
-if(length(extra_traits) > 0){
-  cat("Plotting extra traits PGLS\n")
-  cur.plt <- PlotPGLS(xy_data, models, extra_traits, plt.type="PGLS", default.color=default.col)
-  print(cur.plt$p)
-  ggsave(cur.plt$p, filename=str_interp("${scripts.dir}/pgls_res/PGLS.${exp.name}.extra_traits.pdf"), 
-         width=(w.factor*cur.plt$nc)+2, height=h.factor*cur.plt$nr, device=cairo_pdf)
-}
-
-##### Plot PGLS results for predicted alpha vs alpha #####
-
-for(cur.trait in pred.traits){
-  x.cis <- alpha[, .(Species=species, experiment=cur.trait, 
-                     x_lwr=predicted_alpha_lwr, x_upr=predicted_alpha_upr)]
-  y.cis <- alpha[, .(Species=species, experiment=cur.trait, 
-                     y_lwr=alpha_lwr, y_upr=alpha_upr)]
-  
-  cur.plt <- PlotPGLS(xy_data, models, cur.trait, plt.type="PGLS", 
-                      x.cis=x.cis, y.cis=y.cis, default.color=default.col)
-  cur.plt$p <- cur.plt$p + geom_abline(slope=1, intercept=0, col="grey", alpha=0.5) +
-    coord_cartesian(xlim=c(1, 5.3), ylim=c(1, 5.3))
-  print(cur.plt$p)
-  ggsave(cur.plt$p, filename=str_interp("${scripts.dir}/pgls_res/PGLS.${exp.name}.${cur.trait}.pdf"), 
-         width=4, height=4, device=cairo_pdf)
-}
-
-##### Plot life history PIC results (non-parametric correlation) #####
-cur.plt <- PlotPGLS(pic_data, models, setdiff(c(pca_traits, gnmstat.traits), "AssemblyStatus"), plt.type="PIC", default.color=default.col)
-print(cur.plt$p)
-
-ggsave(cur.plt$p, filename=str_interp("${scripts.dir}/pgls_res/PIC.${cor.method}.${exp.name}.all_traits.pdf"), 
-       width=(w.factor*cur.plt$nc)+2, height=h.factor*cur.plt$nr, device=cairo_pdf)
-
-##### Plot AssemblyStatus vs alpha results #####
-if("AssemblyStatus" %in% names(xy_data)){
-  plt_data <- GetExperimentData(xy_data, "AssemblyStatus")
-  
-  mod_data <- models[experiment == "AssemblyStatus"]
-  
-  hline_data <- mod_data[, .(ml_est = pgls_ml_intercept + c(0, pgls_ml_slope),
-                             pic_est = pgls_intercept + c(0, pgls_slope),
-                             x=1:2)]
-  
-  p <-ggplot(data = plt_data, aes(xvar, yvar)) + 
-    geom_jitter(alpha=0.9, size=1.2, width=0.25, col=default.col) + 
-    geom_violin(alpha=0.3) +
-    geom_hpline(aes(x=x, y=ml_est), data=hline_data, width=0.2, size=1, col=c1, alpha=0.8) +
-    geom_hpline(aes(x=x, y=pic_est), data=hline_data, width=0.2, size=1, col=c2, alpha=0.8) +
-    geom_text(data = mod_data, color=c1, aes(label=pgls_ml_str, color="gray", x = -Inf, y = Inf),
-              hjust = 0, vjust = 1, size = 2.5) +
-    geom_text(data = mod_data, color=c2, aes(label=pgls_str, color="gray", x = -Inf, y = Inf),
-              hjust = 0, vjust = 1, size = 2.5) +
-    # scale_color_manual(values=brewer.pal("Dark2", n=length(unique(plt_data$Order)))) +
-    xlab("AssemblyStatus") + ylab("Alpha")
-  print(p)
-  
-  ggsave(p, filename=str_interp("${scripts.dir}/pgls_res/PGLS.${exp.name}.AssemblyStatus.pdf"), 
-         width=w.factor+2, height=h.factor, device=cairo_pdf)
-}
 
 ##### Perform node height tests #####
-x <- alpha[, alpha]
-names(x) <- alpha$species
+x <- alpha[, Alpha]
+names(x) <- alpha$Species
 x.pic <- pic(x, tree)
 nheights <- dist.nodes(tree)[find_root(tree), as.integer(str_remove(names(x.pic), "A"))]
 nh.res <- lm(abs(x.pic) ~ nheights)
@@ -768,50 +412,60 @@ p <- ggplot(aes(x=x, y=y), data=plt.dat) +
   xlab("Branching times") + ylab("Absolute value of contrasts")
 print(p)
 
-ggsave(p, filename=str_interp("${scripts.dir}/pgls_res/nheight.${exp.name}.pdf"), 
+ggsave(p, filename=str_interp("${out.prefix}.nheight.pdf"), 
        width=4.5, height=4)
 
 # geiger::tips(tree, 148)
 # geiger::tips(tree, 150)
 
-##### Predicted Alpha #####
 
-##### Test Divergence_to_NCA + GenerationLength_d #####
-if(FALSE){
-  subd <- alpha[, .(Species=species, 
-                    experiment,
-                    alpha, Divergence_to_NCA, GenerationLength_d)]
-  for(i in c("Divergence_to_NCA", "GenerationLength_d")){
-    if(config[x==i, xlog]){
-      subd[, eval(i) := log10(get(i))]
-    }
-  }
-    
-  subd <- as.data.frame(na.omit(subd))
-    
-  if (nrow(subd)<3){
-    stop("Can't analyze: alpha ~ Divergence_to_NCA + GenerationLength_d")
-  }
-  phylogeny <- keep.tip(tree, subd$Species)
-  cdat <- comparative.data(data = subd, phy = phylogeny, names.col = "Species")
-  mod <- pgls(alpha ~ Divergence_to_NCA + GenerationLength_d, cdat, lambda="ML", kappa=1, delta=1)
-    
-  df_mod <- list("model" = mod, "data" = subd)
-}
+##### TEST #####
+# for(i in names(pic_data)[1]){
+#   pic.dat <- pic_data[[i]]
+#   raw.dat <- xy_data[[i]]
+#   
+#   pic.lm <- lm(PIC2 ~ PIC1 + 0, data=pic.dat)
+#   raw.lm <- lm(yvar ~ xvar, data=raw.dat)
+#   
+#   p <- ggplot(aes(x=PIC1, y=PIC2), data=pic.dat) + geom_point() + 
+#     geom_smooth(method="lm", formula= y ~ x + 0)
+#   print(p)
+#   
+#   p <- ggplot(aes(x=xvar, y=yvar), data=raw.dat) + geom_point() + 
+#     geom_smooth(method="lm")
+#   print(p)
+#   
+#   print(summary(pic.lm))
+#   print(summary(raw.lm))
+# }
+print(models[, .(experiment, pgls_better=(ols_pval > pgls_pval), 
+                 ols_pval=round(ols_pval, digits=3), 
+                 pgls_pval=round(pgls_pval, digits=3), 
+                 ols_rsq=round(ols_rsq, digits=2), 
+                 pgls_rsq=round(pgls_rsq, digits=2),
+                 ml_lambda_pval=round(ml_lambda_pval, digits=3) )])
 
 ##### SAVE MODEL RESULTS #####
 save.cols <- str_subset(names(models), pattern="_str$", negate=TRUE)
 fwrite(models[, save.cols, with=FALSE], 
-       file=str_interp("${scripts.dir}/pgls_res/${exp.name}.model_params.tsv"), 
+       file=str_interp("${out.prefix}.model_params.tsv"), 
        col.names=TRUE, sep="\t")
 
 ##### SAVE XY DATA #####
-if("AssemblyStatus" %in% names(xy_data)){
-  xy_data$AssemblyStatus[, xvar := as.integer(xvar)]
+if("AssemblyStatus.Alpha" %in% names(xy_data)){
+  xy_data$`AssemblyStatus.Alpha`[, xvar := as.integer(xvar)]
 }
 
 out.dat <- rbindlist(xy_data)
 fwrite(out.dat, 
-       file=str_interp("${scripts.dir}/pgls_res/${exp.name}.xy_data.tsv"), 
+       file=str_interp("${out.prefix}.xy_data.tsv"), 
        col.names=TRUE, sep="\t")
 # warnings()
+
+
+
+
+
+
+
+

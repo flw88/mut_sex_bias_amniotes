@@ -52,11 +52,12 @@ def divide_block(block):
             position = int(species[2])
             block_length = int(species[3])
             strand = species[4]
-            
+            move_pos = len(seq[:region[0]].replace("-",""))
+
             # New values
             new_seq = "".join([seq[i] for i in region])
             new_block_length = sum([new_seq.upper().count(n) for n in all_nucleotides])
-            new_position = position+region[0] if strand=="+" else position-region[0]
+            new_position = position+move_pos if strand=="+" else position-move_pos
             new_species = ['s', species[1], str(new_position), str(new_block_length), strand, species[5], new_seq]
             new_block.append(new_species)
         total_blocks.append(new_block)

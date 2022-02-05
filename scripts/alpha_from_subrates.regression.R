@@ -25,7 +25,10 @@ opt.spec <- matrix(c("help",                "h",  0,     "logical",   0,
                      "features",            "f",  1,     "character", 1, # Comma-separated list of features
                      "in.file",             "i",  1,     "character", 0, # Specify the merged_features file explicitly. (DEFAULT: "${scripts.dir}/merged_features/${experiment.name}.features.txt.gz")
                      "seed",                "s",  1,     "character", 1, # Seed for randomization
-                     "is.zw",               "z",  0,     "logical",   0  # ZW system (not XY)
+                     "report.mean",         "m",  0,     "logical",   0, # Also report alpha estimated from mean across windows (no regression)
+                     "is.zw",               "z",  0,     "logical",   0,  # ZW system (not XY)
+                     "odd.chrom",           "1",  0,     "logical",   0,  # Only use odd-numbered chromosomes and odd X(Z) windows
+                     "even.chrom",          "2",  0,     "logical",   0  # Only use odd-numbered chromosomes and odd X(Z) windows
                      ), byrow=TRUE, ncol=5)
 opt <- getopt(opt.spec[,1:4])
 req.args <- opt.spec[as.logical(as.integer(opt.spec[,5])), 1]
@@ -68,7 +71,10 @@ poisson.glm <- !is.null(opt$poisson.glm) && opt$poisson.glm
 gc.squared <- !is.null(opt$gc.squared) && opt$gc.squared
 weighted <- !is.null(opt$weighted) && opt$weighted
 unrestrict.features <- !is.null(opt$unrestrict.features) && opt$unrestrict.features
-is.zw <- !is.null(opt$is.zw) && opt$is.zw
+report.mean <- !is.null(opt$report.mean) && opt$report.mean
+is.zw       <- !is.null(opt$is.zw) && opt$is.zw
+odd.chrom   <- !is.null(opt$odd.chrom) && opt$odd.chrom
+even.chrom  <- !is.null(opt$even.chrom) && opt$even.chrom
 
 if(weighted && poisson.glm){
   stop("Poisson GLM has not been implemented for weighted regression")
@@ -87,6 +93,10 @@ if( is.null(opt$in.file) ){
 }
 
 
+if( odd.chrom && even.chrom ){
+  stop("Cannot analyze both odd chromosomes (-1) and even chromosomes (-2).
+Please provide only one option.")
+}
 
 # Get chrX(Z) and chrY(W) names
 sp.to.chrom <- fread(str_interp("../data/Species_to_chromosomes.txt"), header=FALSE,
@@ -227,6 +237,17 @@ if(weighted){
   dat <- FilterAndReport(dat, rm.mask, "Filtering sub rate variance <= 0:\n")
 }
 
+if(odd.chrom){
+  set.seed(as.integer(opt$seed) + 1)
+  rm.mask <- !OddWindows(dat)
+  dat <- FilterAndReport(dat, rm.mask, "Filtering 'even' windows (keeping 'odd'):\n") 
+} else if(even.chrom){
+  set.seed(as.integer(opt$seed) + 2)
+
+  rm.mask <- OddWindows(dat)
+  dat <- FilterAndReport(dat, rm.mask, "Filtering 'odd' windows (keeping 'even'):\n") 
+}
+
 ##### REGRESSION #####
 # save.image(file=str_interp("${scripts.dir}/lm_res/${out.prefix}.RData"))
 # stop("debug")
@@ -282,6 +303,28 @@ for(mt in c(sum.types, mut.types, sw.types, bgc.types)){
 fwrite(alpha.dat, file=str_interp("${scripts.dir}/alphas/${out.prefix}.LM.tsv"),
        sep="\t", quote=FALSE)
 
+##### ESTIMATE ALPHA WITHOUT REGRESSION #####
+# Estimate alpha using mean and weighted mean subsitution rates in each bin.
+if(report.mean){
+  alpha.mean <- data.table()
+  for(mt in c(sum.types, mut.types, sw.types, bgc.types)){
+    for(sp in sp.names){
+      for(w in c(TRUE,FALSE)){
+        subrate.col <- str_c(sp, "_", mt) # Which substitutions to use
+
+        new.row <- as.list(AlphaFromMean(dat, subrate.col, is.zw=is.zw, weighted=w))
+        new.row[["species"]]  <- sp
+        new.row[["mut_type"]] <- mt
+        new.row[["weighted_mean"]] <- w
+        alpha.mean <- rbindlist(list(alpha.mean, as.data.table(new.row)))
+      }
+    }
+  }
+
+  fwrite(alpha.mean, file=str_interp("${scripts.dir}/alphas/${out.prefix}.mean.tsv"),
+         sep="\t", quote=FALSE)
+}
+  
 
 ### Print summaries of regression results
 CatRegressionSummary(lm.list[["mod"]], out.file=str_interp("${scripts.dir}/lm_res/${out.prefix}.lm_summaries.txt"))

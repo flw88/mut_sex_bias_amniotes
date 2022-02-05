@@ -203,10 +203,17 @@ PlotRegression <- function(lm.list, feat.var, samp.coef.list, facet.nrow=1,
 }
 
 ##### CREATE X/A PLOT #####
+c.red <- "#FF3939"
+
 gc.mean <- lm.horse[[1]]$data[region=="XZ", mean(gc)]
+tmp <- predict(lm.horse[[1]], newdata=data.table(region=c("XZ", "A"), gc=c(gc.mean, gc.mean), size=c(100, 100)))
+x.mean <- exp(tmp[1]) / 100
+a.mean <- exp(tmp[2]) / 100
+xa.mean <- x.mean / a.mean
 
 gg.obj <- PlotRegression(lm.horse, "gc", samp.coef.horse, norm.subrate=FALSE, thin.autosome=0.5) + 
-  geom_vline(xintercept=gc.mean, color="#F08080", linetype=2) +
+  geom_vline(xintercept=gc.mean, color=c.red, linetype=2) +
+  annotate(geom="point", x=c(gc.mean, gc.mean), y=c(x.mean, a.mean), color=c.red, size=2) +
   xlab("GC Content") + 
   theme(legend.position="none", axis.text=element_blank(), axis.ticks=element_blank())
 print(gg.obj)
@@ -215,13 +222,13 @@ ggsave(gg.obj, file=str_interp("${scripts.dir}/pdfs/pipeline_figure.1.pdf"),
        height=4, width=5, useDingbats=FALSE)
 
 ##### CREATE ALPHA PLOT #####
-tmp <- predict(lm.horse[[1]], newdata=data.table(region=c("XZ", "A"), gc=c(gc.mean, gc.mean), size=c(100, 100)))
-xa.mean <- exp(tmp[1]) / exp(tmp[2])
+use.xlim <- c(0.75,1)
 
-plt.dat <- data.table(x=seq(0.75, 1, length.out=100))
+plt.dat <- data.table(x=seq(0.73, 1.2, length.out=150))
 plt.dat[, y := CalcAlpha(x)]
-gg.obj <- ggplot(plt.dat, aes(x=x, y=y)) + geom_line(color="#4D4D4D", size=1.2, lineend="round") +
-  geom_vline(xintercept=xa.mean, color="#F08080", linetype=2) +
+gg.obj <- ggplot(plt.dat, aes(x=x, y=y)) + geom_line(color="#4D4D4D", size=1.2) +
+  geom_vline(xintercept=xa.mean, color=c.red, linetype=2) + coord_cartesian(xlim=use.xlim, ylim=sort(CalcAlpha(use.xlim))) +
+  annotate(geom="point", x=xa.mean, y=CalcAlpha(xa.mean), color=c.red, size=2) +
   xlab("X/A Substitution rate ratio") + ylab("Alpha")
 print(gg.obj)
 ggsave(gg.obj, file=str_interp("${scripts.dir}/pdfs/pipeline_figure.2.pdf"),

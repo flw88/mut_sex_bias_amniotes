@@ -22,8 +22,9 @@ main.dir <- "/moto/palab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
 ###--- Run this commented block to test locally ---#
 # main.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
 # opt <- list(ref.species="Gallus_gallus",
-#             exp.name="Aves",
-#             out.exp="Aves_g1,Aves_g2,Aves_g3,Aves_g4,Aves_g5,Aves_g6")
+#             exp.name="Birds",
+#             out.exp="Birds_g1,Birds_g2,Birds_g3,Birds_g4,Birds_g5,Birds_g6",
+#             overwrite=TRUE)
 ###--------------------------------------------#
 
 scripts.dir <- str_interp("${main.dir}/scripts")
@@ -54,11 +55,11 @@ out.exp <- str_split(out.exp, ",")[[1]]
 overwrite <- opt$overwrite
 
 ##### Set up file names #####
-if(exp.name != "Aves"){
-  stop("Currently only needed to run 'Aves' right now")
+if(exp.name != "Birds"){
+  stop("Currently only needed to run 'Birds' right now")
 }
 
-out.fn <- str_interp("${data.dir}/Aves_metadata_and_alphas.csv")
+out.fn <- str_interp("${data.dir}/Birds_metadata_and_alphas.csv")
 if(file.exists(out.fn)){
   if(overwrite){
     cat(str_interp("This script will overwrite ${out.fn}\n"))
@@ -68,8 +69,8 @@ if(file.exists(out.fn)){
 }
 
 alpha.fn <- str_interp("${scripts.dir}/alphas/${exp.name}.${ref.species}.LM.tsv")
-gen.fn <- str_interp("${data.dir}/Aves_traits.tsv")
-meta.fn <- str_interp("${data.dir}/Aves_assembly_metadata.csv")
+gen.fn <- str_interp("${data.dir}/Birds_traits.tsv")
+meta.fn <- str_interp("${data.dir}/Birds_assembly_metadata.csv")
 
 ##### LOAD DATA #####
 a.dat <- fread(alpha.fn)

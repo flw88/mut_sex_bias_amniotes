@@ -6,7 +6,7 @@ do
     case "${flag}" in
         w) region_file=${OPTARG};;  # Bed files with coordinates of windows to extract
         r) ref_name=${OPTARG};;  # Genome to be used as reference sequence
-        c) spname=${OPTARG};;  # Alias/code name for experiment, whatever string one likes/prefers, Must have been used in filter step!
+        c) spname=${OPTARG};;  # Alias/code name for experiment, whatever string one likes/prefers, Must have been used in filter step
         s) sub_rates='true' ;; # Collect sub rates
         n) counts='true' ;; # Collect sub counts 
         m) methylation='true' ;; # Collect methylation
@@ -28,7 +28,7 @@ while read chunk;do
 
     # Important files
     bed_file="$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.bed";
-    bed_file=$(echo $bed_file | sed 's/Aves_g[1-9]/Aves/g' | sed 's/Serpentes5/Serpentes/g');
+    bed_file=$(echo $bed_file | sed 's/Birds_g[1-9]/Birds/g');
     tr_tab="tr '\n' '\t'"
     cmd="";
 
@@ -91,11 +91,11 @@ while read chunk;do
     # Replication timing
     if [ "$rep_timing" == true ]; then
     if [ -z "$cmd" ];then trail=""; else trail=" | $tr_tab;";fi
-        #reptiming_bed="$features_path/$ref_name.repTiming.bed";
+        reptiming_bed="$features_path/$ref_name.repTiming.bed";
         #reptiming_bed="$features_path/Koren_et_al_Table_S2.lift-hg38.bed";
         #reptiming_bed="$features_path/Mus_musculus.repTiming.Spermatogonia.bed";
         #reptiming_bed="$features_path/Mus_musculus.repTiming.PGC_female.bed";
-        reptiming_bed="$features_path/Mus_musculus.repTiming.PGC_male.bed";
+        #reptiming_bed="$features_path/Mus_musculus.repTiming.PGC_male.bed";
         cmd=$(echo $cmd"$trail awk '{print \$1\"\t\"\$2-1\"\t\"\$3}' $bed_file | bedtools merge -i - | sed \"s/$ref_name.//g\" | bedtools intersect -a $reptiming_bed -b - | python weighted_average_replication_timing.py | $tr_tab");
         cmd=$(echo $cmd";printf '${chrom}\t${start}\t${end}\n' | bedtools intersect -a $reptiming_bed -b - | python weighted_average_replication_timing.py");
     fi;
@@ -116,7 +116,7 @@ while read chunk;do
     if [ "$gc_sp_specific" == true ]; then
     if [ -z "$cmd" ];then trail=""; else trail=" | $tr_tab;";fi
         maf="$maf_output_path/$ref_name/$chrom/$chrom.$start.$end.$spname.filtered.maf";
-	maf=$(echo $maf | sed 's/Aves_g[1-9]/Aves/g');
+	maf=$(echo $maf | sed 's/Birds_g[1-9]/Birds/g');
 	maf=$(echo $maf | sed 's/Serpentes5/Serpentes/g');
         cmd=$(echo $cmd" $trail cat $maf | python gc_content_from_maf.py -s ../data/${spname}.txt");
     fi;
