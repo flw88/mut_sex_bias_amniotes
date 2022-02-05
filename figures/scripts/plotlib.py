@@ -23,10 +23,10 @@ def identity_line(ax=None, ls='--', *args, **kwargs):
     ax.callbacks.connect('ylim_changed', callback)
     return ax
 
-def plot_line(intercept, slope, xmin, xmax, c, ax):
+def plot_line(intercept, slope, xmin, xmax, c, ax, ls='solid'):
     x = np.array([xmin, xmax])
     y = intercept + (slope * x)
-    ax.plot(x, y, c=c)
+    ax.plot(x, y, c=c, ls=ls)
     
 def make_xtick_lab(xticks, xmaj):
     xlab = [''] * len(xticks)
@@ -41,8 +41,10 @@ def make_xtick_lab(xticks, xmaj):
                     xlab[i] = r'$10^{:d}$'.format(pwr)
                 else:
                     xlab[i] = r'${:d} \times 10^{:d}$'.format(factor, pwr)
+            elif x < 1:
+                xlab[i] = format(x, '0.1f')
             else:
-                xlab[i] = format(x, '0.1g')
+                xlab[i] = format(x, '0.0f')
     return xlab
 
 def make_pgls_legend(lam=None, pval=None, r2=None):

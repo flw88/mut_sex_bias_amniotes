@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import itertools
 import sys
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
@@ -11,6 +12,80 @@ import matplotlib.colors as colors_mplt
 from adjustText import adjust_text
 import statsmodels.stats.proportion
 
+def df2dict(df, key, value):
+    '''Returns dictionary out of two columns in a dataframe'''
+    return df.set_index(key)[value].to_dict()
+
+def min_div_to_chrom_assembly(df, target_sp, clevel_sps, tree):
+    '''Returns the minimum distance between sp and a chromosome level assembly'''
+    if target_sp in clevel_sps:
+        return 0
+    distances = [tree.get_distance(target_sp, sp) for sp in clevel_sps]
+    return min(distances)
+
+def get_worst_species(df, decision_tree):
+    '''Returns species ranking higher in decision tree'''
+    for param, criteria in decision_tree.items():
+        if criteria!="Max" and criteria!="Min":
+            subd = df[df[param]!=criteria]
+            if len(subd)==1:
+                return subd.Species.values[0]
+        else:
+            if len(df[param].unique())==1:
+                continue
+            sorted_d = df.sort_values(by=param, ascending=False if criteria!="Max" else True)
+            sorted_d.index = range(len(sorted_d))
+            return sorted_d.Species.values[0]
+
+def conservative_prune_dataset_by_pi(df, times_pi, decision_tree, tree):
+    '''Thins dataset, ensuring species are at list times_pi*pi diverged and >2%
+    keeping species according to decision tree'''
+    
+    exclude_species = []
+    sp_universe = [tree.get_leaf_names()]
+    for sp1,sp2 in itertools.combinations(df.Species, 2):
+        distance = tree.get_distance(sp1,sp2)
+        pi1 = float(df[df.Species==sp1]["Pi_het"])
+        pi2 = float(df[df.Species==sp2]["Pi_het"])
+        max_pi = np.nanmax([pi1,pi2])
+        min_distance = max_pi*times_pi
+        if min_distance>=distance or distance<=0.02:
+            worst_sp = get_worst_species(df[df.Species.isin([sp1,sp2])], decision_tree)
+            exclude_species.append(worst_sp)
+        
+    pruned_df = df[~df.Species.isin(exclude_species)]
+    return pruned_df
+    
+def prune_dataset_by_pi(df, times_pi, decision_tree, tree):
+    '''Thins dataset, ensuring species are at list times_pi*pi diverged
+    keeping species according to decision tree'''
+    
+    # All comparisons, record if pair is valid
+    total_species = df.Species
+    matrix = []
+    for sp1,sp2 in itertools.combinations(total_species, 2):
+        distance = tree.get_distance(sp1,sp2)
+        pi1 = float(df[df.Species==sp1]["Pi_het"])
+        pi2 = float(df[df.Species==sp2]["Pi_het"])
+        max_pi = np.nanmax([pi1,pi2]) if not all(math.isnan(p) for p in [pi1,pi2]) else 10
+        min_distance = max_pi*times_pi
+        matrix.append([sp1,sp2,0 if min_distance>distance else 1, distance])
+        
+    c_df = pd.DataFrame(matrix)
+    c_df.columns = ["sp1","sp2","acceptance","divergence"]
+    return c_df
+    # Find valid combination with highest numerber of species
+    for n in range(len(total_species)+1)[::-1]:
+        sys.stderr.write("Trying combination of {} species...\n".format(n))
+        for sp_set in itertools.combinations(total_species, n):
+            set_df = c_df[(c_df.sp1.isin(sp_set)) & 
+                          (c_df.sp2.isin(sp_set))]
+            validity = set_df.acceptance.sum()==len(set_df)
+            if validity:
+                sys.stderr.write("Found a valid set of {} species.\n".format(n))
+                return sp_set
+
+    sys.stderr.write("There's no safe dataset...!")
 
 def replace_values(array,minv,maxv):
     '''Truncate range of values given a min and max value'''
@@ -202,6 +277,10 @@ def predict_alpha(mu_f, mu_m, G_f, G_m, n_e):
     maternal = G_f*mu_f + n_e
     paternal = G_m*mu_m + n_e
     return paternal/maternal
+
+def predict_yearly_rate(mu_ee, mu_f, mu_m, G_f, G_m):
+    '''Predicts yearly mutation rate'''
+    return (2*mu_ee + (mu_f*G_f) + (mu_m*G_m))/(G_f+G_m)
 
 def ratioG(G_a, ratio):
     '''Returns sex-specific generation times given a male-to-female ratio'''
