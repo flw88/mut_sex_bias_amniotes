@@ -14,11 +14,10 @@ Microcebus_murinus	CM007693.1	1-5000000
 Mus_musculus	chrX	168000000-171031299
 Mus_pahari	LT608300.1	Unk
 Rattus_norvegicus	chrX	Unk
-Thamnophis_elegans	NC_045558.1	TBD
 Crotalus_viridis	CM012323.1	106784505-113984505
 Naja_naja	Z	TBD
 Gallus_gallus	chrZ	1-2000000
 Cairina_moschata	chrZ	TBD
 Numida_meleagris	CM007843.2_Numida_meleagris_isolate_19003_breed_g44_Domestic_line_chromosome_Z,_whole_genome_shotgun_sequence	TBD
 Ficedula_albicollis	NC_021700.1_Ficedula_albicollis_isolate_OC2_chromosome_Z,_FicAlb1.5,_whole_genome_shotgun_sequence	None
-Thamnophis_elegans	NC_045558.1	1-6000000,125000000-145130870
+Thamnophis_elegans	NC_045558.1	1-1000000,132000000-145130870
