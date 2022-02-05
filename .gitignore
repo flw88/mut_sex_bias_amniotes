@@ -3,7 +3,29 @@
 ._*
 *.pdf
 .ipynb_checkpoints/
+.ipynb
+__pycache__
 
 # Specific directories
-./scripts/lm_res/
-./features/
+scripts/lm_res/
+scripts/qu/
+features/
+ucsc_data/
+
+# Specific files
+notebooks/Figure_2.ipynb
+notebooks/Figure_3.ipynb
+notebooks/Figure_4.ipynb
+
+data/legacy_20220204/
+figures/scripts/.~Figure_4.ipynb
+figures/scripts/Figure_3-4.ipynb
+figures/scripts/Figure_4_old.ipynb
+figures/scripts/Figure_SX_CpG_vs_CpG-out.ipynb
+figures/scripts/Figure_SX_G_vs_model_yearly_rates.ipynb
+figures/scripts/Figure_SX_Predicted_alpha_dnms.ipynb
+figures/scripts/Figure_SX_increase_alpha_parental_ages.ipynb
+figures/scripts/Figure_SX_reptiming_vs_gc.ipynb
+figures/scripts/tmp.Figure_3-4C.OLS.ipynb
+figures/scripts/tmp.Figure_4.OLS.ipynb
+figures/scripts/tmp.Figure_SX_PGLS_traits.OLS.ipynb
