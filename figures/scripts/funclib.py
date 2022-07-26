@@ -120,6 +120,24 @@ def reverse_miyata(alpha):
 
 def alpha_from_pedigrees(dnm_file):
     """Reads dnms from file and computes alpha and binomial CIs"""
+    dnm_df = pd.read_csv(dnm_file)
+    alpha_ped = {sp:[df["Paternal_dnms"].sum(),df["Maternal_dnms"].sum()] for sp,df in dnm_df.groupby("Species")}
+    dnm_ci = {}
+    for sp,muts in alpha_ped.items():
+        if sum(muts)==0:
+            continue
+        paternal, maternal = alpha_ped[sp]
+        alpha = paternal/maternal
+        llimit, ulimit = statsmodels.stats.proportion.proportion_confint(paternal,
+                                                                         paternal+maternal)
+        dnm_ci[sp] = [llimit/(1-llimit),
+                      alpha,
+                      ulimit/(1-ulimit)
+                     ]
+    return dnm_ci
+
+def alpha_from_pedigrees_txt(dnm_file):
+    """Reads dnms from file and computes alpha and binomial CIs"""
     dnm_df = pd.read_csv(dnm_file,sep="\t")
     dnm_df["Species_simple"] = ["_".join(sp.split()[:2]) for sp in dnm_df.Species]
     alpha_ped = {sp:[df["Pat DNMs"].sum(),df["Mat DNMs"].sum()] for sp,df in dnm_df.groupby("Species_simple")}
