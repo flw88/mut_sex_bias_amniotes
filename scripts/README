@@ -5,7 +5,7 @@ jupyter lab ./../notebooks/Filter_*ipynb
 while read line;do \
  read order out_exp ref chrX param seed feature hal sexchrom <<<$(echo $line); \
  bash hal2maf_subset.sh -w region_files/$ref.1Mb.bed -l ../data/$order.txt -r $ref -c $order -g 3 -a $hal;
-done < <(grep Mammals config_file.txt)
+done < <(cat config_file.txt)
 
 #2. Filter MAFs and estimate substitution rates
 # For different conditions in filtering:
@@ -15,13 +15,13 @@ done < <(grep Mammals config_file.txt)
 while read line;do \
  read order out_exp ref chrX param seed feature hal sexchrom <<<$(echo $line); \
  bash filter_maf_phyloFit.sh -w region_files/$ref.1Mb.bed -l ../data/${order}.txt -r $ref -c $order -o $out_exp -x $chrX -n ../trees/${order}.nwk -s exons-1kb-pad_rmsk -a;
-done < <(egrep "Homo_sapiens" config_file.txt)
+done < <(cat config_file.txt)
 
 #2.1 (Snakes only) Run phylofit on longest chromosome
 while read line;do \
  read order out_exp ref chrX param seed feature hal sexchrom <<<$(echo $line); \
  bash phyloFit_chromosome.sh -w region_files/$ref.1Mb.bed -l ../data/${order}.txt -r $ref -c $order -o $out_exp -x $chrX -n ../trees/${order}.nwk -s filtered -b;
-done < <(grep Snakes config_file.txt)
+done < <(cat config_file.txt)
 
 #3. Collect features and rates
 while read line;do \
@@ -29,7 +29,7 @@ while read line;do \
   for group in $(echo $out_exp | tr "," "\n");do 
     bash collect_features_rates.sh -w region_files/$ref.1Mb.bed -r $ref -c $group $param;
   done;
-done < <(egrep "Snakes" config_file.txt)
+done < <(cat config_file.txt)
 
 #4. Merge collect files
 while read line;do 
@@ -37,9 +37,8 @@ while read line;do
  for group in $(echo $out_exp | tr "," "\n");do
    ls merged_features/*.$group.$ref.features.txt.gz | xargs zcat | grep chrom | head -1 | gzip > merged_features/$group.$ref.features.txt.gz;
    ls merged_features/*.$group.$ref.features.txt.gz | sort -V | xargs zcat | grep -v "chrom" | gzip >> merged_features/$group.$ref.features.txt.gz;
-   #ls merged_features/*.$group.$ref.features.txt.gz | grep -E "chr[1-9].Aves|Z.Aves|W.Aves" | sort -V | xargs zcat | grep -v "chrom" | gzip >> merged_features/$group.$ref.features.txt.gz;
  done;
-done < <(cut -f2,3 config_file.txt | egrep "Birds|Homo_sapiens")
+done < <(cut -f2,3 config_file.txt)
 
 #5. Alpha from regression
 while read line;do \
@@ -48,9 +47,9 @@ while read line;do \
  for group in $(echo $out_exp | tr "," "\n");do
   bash alpha_from_subrates.sh $ref $group -s ${seed} -f $feature ${zflag} -m -o ${group}.${ref};
  done;
-done < <(egrep "Homo|Birds" config_file.txt)
+done < <(cat config_file.txt)
 
-#5.1 Alpha from regression including reptiming
+#5.1 Alpha from regression including reptiming (Mammals, Homo_sapiens ref only)
 read order out_exp ref chrX param seed feature hal sexchrom <<<$(grep Homo_sapiens config_file.txt); 
 zflag=""; if [ $sexchrom == "ZW" ]; then zflag="-z"; fi
 for group in $(echo $out_exp | tr "," "\n");do
@@ -65,12 +64,12 @@ bash alpha_from_subrates.sh $ref $group -s ${seed} -f $feature ${zflag} -m -1 -o
 bash alpha_from_subrates.sh $ref $group -s ${seed} -f $feature ${zflag} -m -2 -o ${group}.${ref}.even;
 done;
 
-#6 Exclude outgroups (if needed, only in Aves at the moment)
-suffix="exon_phastcons_lcase.LM"
+#6 Exclude outgroups (if needed, only in Birds at the moment)
+for suffix in "LM" "mean" ; do
 head -1 alphas/Birds_g1.Gallus_gallus.$suffix.tsv > alphas/Birds.Gallus_gallus.$suffix.tsv
 for i in $(seq 1 6);do python merge_alpha_from_LM.py -o ./../data/outgroups.txt -g Birds_g${i}.Gallus_gallus -s "$suffix.tsv";done >> alphas/Birds.Gallus_gallus.$suffix.tsv
-head -1 alphas/Birds_g1.Gallus_gallus.mean.tsv > alphas/Birds.Gallus_gallus.mean.tsv
-for i in $(seq 1 6);do python merge_alpha_from_LM.py -o ./../data/outgroups.txt -g Birds_g${i}.Gallus_gallus -s "$suffix.tsv";done >> alphas/Birds.Gallus_gallus.mean.tsv
+done
+
 
 #7. Plot results
 python plot_alpha_with_tree.py -x Mammals.Homo_sapiens -t -o pdfs/Mammals.Homo_sapiens.mod.pdf -i mod -c experiment -g 0.9,1.1 -n ../trees/241-mammalian-2020v2.phast-242.nh -y 25 -p ../data/plot_colors.tsv
@@ -81,20 +80,11 @@ python plot_alpha_with_tree.py -x Snakes.Thamnophis_elegans -t -o pdfs/Snakes.Th
 Rscript mk_subrate_tab.R
 jupyter lab ./../notebooks/2exposure_model.ipynb
 
-##################################################
-# FW: I don't think we're using these results anymore...
-#
-#9. Alpha pvalues
-# while read line;do \
-#   read order out_exp ref chrX param seed feature hal sexchrom <<<$(echo $line); \
-#   ./test_alpha_constancy.sh -r $ref -c $order -o $out_exp
-# done < <( grep -v Serpentes config_file.txt )
-##################################################
-
-#10 PGLS (Has to be run locally for now because certain R packages won't install properly on server)
+#9. PGLS (Has to be run locally for now because certain R packages won't install properly on server)
 for i in 3 5 7; do # Iter over early embryonic values for prediction. Really, this should only affect the "Mammals" results.
 ./alpha_PGLS.R -c Mammals -e $i
 ./alpha_PGLS.R -c Birds   -e $i
 done
 
-
+#10. Produce table of beta values
+./run.betas_table.sh 
