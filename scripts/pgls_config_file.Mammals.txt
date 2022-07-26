@@ -3,12 +3,12 @@ Generation_time_y	True	Alpha	False	NA	pca
 Maximum_longevity	True	Alpha	False	NA	other
 #Male_maturity	True	Alpha	False	NA	other
 #Female_maturity	True	Alpha	False	NA	other
-Gestation	True	Alpha	False	NA	pca
+Gestation_d	True	Alpha	False	NA	pca
 #Metabolic_rate	True	Alpha	False	NA	other
-Adult_weight	True	Alpha	False	NA	pca
+Adult_weight_g	True	Alpha	False	NA	pca
 #Litter_size	False	Alpha	False	NA	other
 #Weaning	True	Alpha	False	NA	other
-Birth_weight	True	Alpha	False	NA	pca
+Birth_weight_g	True	Alpha	False	NA	pca
 #Metabolic_rate_gram	True	Alpha	False	NA	other
 AssemblyStatus	False	Alpha	False	NA	gnmstat
 Divergence_to_NCA	False	Alpha	False	NA	gnmstat
