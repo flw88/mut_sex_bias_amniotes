@@ -29,8 +29,8 @@ req.args <- opt.spec[as.logical(as.integer(opt.spec[,5])), 1]
 
 ###--- Run this commented block to test locally ---#
 main.dir <- "/Users/felix/mt_mp_lab/projects/male_mutation_bias_XA/mut_sex_bias_amniotes"
-# opt <- list(exp.name="Birds", ee.mut="5")
 # opt <- list(exp.name="Mammals", ee.mut="5")
+# opt <- list(exp.name="Birds", ee.mut="5")
 
 ###--------------------------------------------#
 
@@ -55,26 +55,20 @@ for(arg in req.args){
 
 exp.name <- opt$exp.name
 ee.mut <- as.integer(opt$ee.mut)
-# out.exp <- opt$out.exp # Output experiments. Sub groupings of a particular order
-# out.exp <- str_split(out.exp, ",")[[1]]
-# covariate <- opt$covariate
 
 
 ##### Set up file names #####
 alpha.file <- str_interp("${data.dir}/Table_S2.csv")
 if(exp.name == "Mammals"){
-  # alpha.file  <- str_interp("${main.dir}/data/XA_2exposure-model_alphas.csv")
   tree.file   <- str_interp("${main.dir}/trees/mammals241.TimeTree.nwk")
   phast.file  <- str_interp("${main.dir}/trees/241-mammalian-2020v2.phast-242.nh")
 } else if(exp.name == "Birds"){
-  # alpha.file  <- str_interp("${main.dir}/data/Birds_metadata_and_alphas.csv")
   tree.file   <- str_interp("${main.dir}/trees/Birds.TimeTree.nwk")
   phast.file  <- str_interp("${main.dir}/trees/363-avian-2020-phast.nh")
 } else {
   stop("Currently can only handle 'Mammals' and 'Birds' right now")
 }
 
-# nm.map.file <- str_interp("${main.dir}/trees/TimeTree.spname_map.tab")
 config.file <- str_interp("${scripts.dir}/pgls_config_file.${exp.name}.txt")
 
 colors.file    <- str_interp("${main.dir}/data/plot_colors.tsv")
@@ -415,29 +409,8 @@ print(p)
 ggsave(p, filename=str_interp("${out.prefix}.nheight.pdf"), 
        width=4.5, height=4)
 
-# geiger::tips(tree, 148)
-# geiger::tips(tree, 150)
 
 
-##### TEST #####
-# for(i in names(pic_data)[1]){
-#   pic.dat <- pic_data[[i]]
-#   raw.dat <- xy_data[[i]]
-#   
-#   pic.lm <- lm(PIC2 ~ PIC1 + 0, data=pic.dat)
-#   raw.lm <- lm(yvar ~ xvar, data=raw.dat)
-#   
-#   p <- ggplot(aes(x=PIC1, y=PIC2), data=pic.dat) + geom_point() + 
-#     geom_smooth(method="lm", formula= y ~ x + 0)
-#   print(p)
-#   
-#   p <- ggplot(aes(x=xvar, y=yvar), data=raw.dat) + geom_point() + 
-#     geom_smooth(method="lm")
-#   print(p)
-#   
-#   print(summary(pic.lm))
-#   print(summary(raw.lm))
-# }
 print(models[, .(experiment, pgls_better=(ols_pval > pgls_pval), 
                  ols_pval=round(ols_pval, digits=3), 
                  pgls_pval=round(pgls_pval, digits=3), 
