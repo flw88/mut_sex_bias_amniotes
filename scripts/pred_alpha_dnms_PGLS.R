@@ -50,7 +50,7 @@ exp.name <- "DNMs"
 
 
 ##### Set up file names #####
-alpha.file <- str_interp("${data.dir}/Table_S1_ee${ee.mut}.csv")
+alpha.file <- str_interp("${data.dir}/Table_S2.csv")
 
 tree.file   <- str_interp("${main.dir}/trees/DNMs.TimeTree.nwk")
 
@@ -58,7 +58,7 @@ config.file <- str_interp("${scripts.dir}/pgls_config_file.${exp.name}.txt")
 
 colors.file    <- str_interp("${main.dir}/data/plot_colors.tsv")
 
-out.prefix <- str_interp("${scripts.dir}/pgls_res/ee${ee.mut}/${exp.name}")
+out.prefix <- str_interp("${scripts.dir}/pgls_res/Me${ee.mut}/${exp.name}")
 
 # where to cat output to
 cat.file    <- str_interp("${out.prefix}.output.txt")
@@ -83,7 +83,7 @@ config <- fread(cmd = str_interp("grep -v '^#' ${config.file}"))
 ##### Add data columns #####
 for(x in config$x){
   if(!(x %in% names(alpha))){
-    alpha[[x]] <- alpha$Predicted_alpha_dnms
+    alpha[[x]] <- alpha[[str_interp("Predicted_alpha_dnm_Me${ee.mut}")]]
   }
 }
 
@@ -116,11 +116,12 @@ for (row in config[, .I[!skipped]]){
   
   # Run pgls and pic
   pgls_ml <- runPGLS(cur.alpha, x, y, xlog, ylog, tree, lambda="ML", kappa=1, delta=1)
-  if (pgls_ml[1]=="NA"){
-    cat(str_interp("Skipping ${experiment}, no observations left"), file=cat.file, append=TRUE)
-    config[row, skipped := TRUE]
-    next
-  }
+  
+  # if (pgls_ml[1]=="NA"){
+  #   cat(str_interp("Skipping ${experiment}, no observations left"), file=cat.file, append=TRUE)
+  #   config[row, skipped := TRUE]
+  #   next
+  # }
   pgls <- runPGLS(cur.alpha, x, y, xlog, ylog, tree, lambda=1, kappa=1, delta=1)
   pic  <- picModel(cur.alpha, x, y, xlog, ylog, tree)
   if(!(class(cur.alpha[[x]]) %in% c("factor", "character"))){
