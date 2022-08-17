@@ -1,0 +1,5 @@
+Felis_catus.i1
+Felis_catus.i2
+Naja_naja.i1
+Naja_naja.i2
+Thamnophis_elegans.i1
