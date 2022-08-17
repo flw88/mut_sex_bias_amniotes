@@ -1,23 +1,37 @@
 # General file names to ignore
 .DS_Store
 ._*
+.~*
 *.pdf
 .ipynb_checkpoints/
 .ipynb
 __pycache__
+.Rhistory
 
 # Specific directories
 scripts/lm_res/
 scripts/qu/
+scripts/old/
+scripts/out/
+scripts/yadira_matt/
+scripts/mix_res/
 features/
 ucsc_data/
+figures/silhouettes
+microcebus/
 
 # Specific files
+scripts/yadira_matt.zip
+scripts/README.elife
+scripts/README.ucsc
+scripts/plot_alpha_with_tree.py
+
 notebooks/Figure_2.ipynb
 notebooks/Figure_3.ipynb
 notebooks/Figure_4.ipynb
 
 data/legacy_20220204/
+
 figures/scripts/.~Figure_4.ipynb
 figures/scripts/Figure_3-4.ipynb
 figures/scripts/Figure_4_old.ipynb
@@ -29,3 +43,6 @@ figures/scripts/Figure_SX_reptiming_vs_gc.ipynb
 figures/scripts/tmp.Figure_3-4C.OLS.ipynb
 figures/scripts/tmp.Figure_4.OLS.ipynb
 figures/scripts/tmp.Figure_SX_PGLS_traits.OLS.ipynb
+
+trees/Aves.*
+trees/Serpentes*
